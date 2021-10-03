@@ -27,3 +27,7 @@ export function sendNotification(message){
 export function openOptionsPage(){
     chrome.runtime.openOptionsPage();
 }
+
+export function connectExtension(extensionId){
+    return chrome.runtime.connect(extensionId);
+}

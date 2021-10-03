@@ -1,12 +1,14 @@
-import {useState, useEffect} from 'react'
-import {useAtom} from 'jotai'
-import {Select} from 'baseui/select'
-import {LabelSmall, MonoParagraphXSmall} from 'baseui/typography'
+import type {InjectedAccountWithMeta, InjectedAccount} from '@polkadot/extension-inject/types'
+import accountAtom from 'atoms/account'
 import {Block} from 'baseui/block'
 import {FormControl} from 'baseui/form-control'
-import type {InjectedAccountWithMeta} from '@polkadot/extension-inject/types'
-import {enablePolkadotExtension} from 'lib/polkadotExtension'
-import accountAtom from 'atoms/account'
+import {Select} from 'baseui/select'
+import {LabelSmall, MonoParagraphXSmall} from 'baseui/typography'
+import {useAtom} from 'jotai'
+import { enablePolkadotExtension } from 'lib/polkadotExtension'
+// import PolkadotExtension from 'lib/polkadot_extension'
+import {useEffect, useState} from 'react'
+
 
 const trimAddress = (address: string) =>
   `${address.slice(0, 6)}…${address.slice(-6)}`
@@ -20,16 +22,16 @@ const AccountSelect = (): JSX.Element => {
     let unsubscribe: () => void
 
     enablePolkadotExtension()
-      .then(async () => {
+      .then(async (extension) => {
         const handleAccounts = (accounts: InjectedAccountWithMeta[]): void => {
           setOptions(accounts)
         }
-        const {web3Accounts, web3AccountsSubscribe} = await import(
-          '@polkadot/extension-dapp'
-        )
-        const accounts = await web3Accounts()
-        handleAccounts(accounts)
-        unsubscribe = await web3AccountsSubscribe(handleAccounts)
+        const accounts =  await extension.listAccounts()
+        console.log(accounts)
+        const accountsWithMeta: any[] = accounts.map(({ address, name }) =>
+        ({ address, meta: { name: `${name}` } }));
+        handleAccounts(accountsWithMeta)
+        // unsubscribe = await web3AccountsSubscribe(handleAccounts)
       })
       .catch(() => {
         setError(true)
