@@ -65,15 +65,23 @@ export const create: CreateFn = async ({api, baseURL}) => {
   }).post
 
   // Get public key from remote for encrypting
-  const {public_key} = pruntime_rpc.PhactoryInfo.decode(
-    new Uint8Array((await http<ArrayBuffer>('/prpc/PhactoryAPI.GetInfo')).data)
+  console.log('Getting info');
+  const factoryInfo = pruntime_rpc.PhactoryInfo.decode(
+    new Uint8Array((await http<ArrayBuffer>('http://localhost:8000/prpc/PhactoryAPI.GetInfo')).data)
   )
+  // const factoryInfo = pruntime_rpc.PhactoryInfo.decode(
+  //   new Uint8Array((await http<ArrayBuffer>('/prpc/PhactoryAPI.GetInfo')).data)
+  // )
+  console.log('factoryInfo', factoryInfo);
+  console.log('initialized', factoryInfo.initialized);
+  console.log('registered', factoryInfo.registered);
+  const public_key = factoryInfo.public_key;
   if (!public_key) throw new Error('No remote pubkey')
   const remotePubkey = hexAddPrefix(public_key)
 
   // Create a query instance with protobuf set
   const contractQuery = (data: pruntime_rpc.IContractQueryRequest) =>
-    http<ArrayBuffer>('/prpc/PhactoryAPI.ContractQuery', data, {
+    http<ArrayBuffer>('http://localhost:8000/prpc/PhactoryAPI.ContractQuery', data, {
       transformRequest: (data: pruntime_rpc.IContractQueryRequest) =>
         pruntime_rpc.ContractQueryRequest.encode(data).finish(),
     })
