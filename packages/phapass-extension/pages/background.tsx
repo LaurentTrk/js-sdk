@@ -3,6 +3,7 @@ import type {ApiPromise} from '@polkadot/api'
 import {toaster} from 'baseui/toast'
 import {installMessageListener, openOptionsPage} from 'lib/chrome'
 import {createApi} from 'lib/polkadotApi'
+import { enablePolkadotExtension } from 'lib/polkadotExtension'
 import Head from 'next/head'
 import {useEffect, useState} from 'react'
 
@@ -53,8 +54,11 @@ const Background: Page = () => {
     })
       .then((api) => {
         setApi(api)
-        return createPhala({api, baseURL}).then((phala) => {
+        return createPhala({api, baseURL}).then(async (phala) => {
           openOptionsPage()
+          const polkadotExtension = await enablePolkadotExtension()
+          polkadotExtension.approveUs()
+          console.log(await polkadotExtension.listAccounts())
           setPhala(() => phala)
         })
       })
