@@ -1,0 +1,21 @@
+{
+  "manifest_version": 2,
+  "short_name": "PhaPass",
+  "version": "0.1.0",
+  "name": "Phala Password Manager",
+  "description": "Password Manager using Phala Blockchain <https://phala.network/>",
+  "author":"Laurent Turek <laurent.turek@gmail.com>",
+  "homepage_url": "https://github.com/LaurentTrk/phapass-extension",
+  "browser_action": {
+    "default_icon": "phala-34.png"
+  },
+  "icons": {
+    "128": "phala-128.png"
+  },
+  "options_page": "guess-number.html",
+  "permissions": [
+    "http://localhost/",  "storage",
+    "notifications"
+  ],
+  "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'"
+}
