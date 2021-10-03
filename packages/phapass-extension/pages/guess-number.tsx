@@ -23,8 +23,42 @@ import {Block} from 'baseui/block'
 import {ButtonGroup} from 'baseui/button-group'
 import {decodeAddress} from '@polkadot/util-crypto'
 
+import PolkadotExtension from 'lib/polkadot_extension'
+
+
+
 const baseURL = '/'
 const CONTRACT_ID = 100
+
+export class Signer {
+  polkadot_extension: PolkadotExtension
+  nextId: number
+    
+  constructor (_polkadot_extension: PolkadotExtension) {
+      this.polkadot_extension = _polkadot_extension; 
+      this.nextId = 0
+  }
+
+  async signPayload (payload: any){
+    const id = ++this.nextId; 
+    const result = await this.polkadot_extension.sendRequest(id, 'pub(extrinsic.sign)', payload);
+    return {
+      ...result,
+      id
+    };
+  }
+
+  async signRaw (payload: any){
+    const id = ++this.nextId;
+    const result = await this.polkadot_extension.sendRequest(id, 'pub(bytes.sign)', payload);
+
+    return {
+      ...result,
+      id
+    };
+  }
+}
+
 
 const Game = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
   const [account] = useAtom(accountAtom)
@@ -51,7 +85,13 @@ const Game = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
     if (account) {
       setSignCertificateLoading(true)
       try {
-        const signer = await getSigner(account)
+
+        const polkadot_extension = new PolkadotExtension('pojddmoepiiamclkdbboejabojgjhfjc', 'PhaPass');
+        await polkadot_extension.approveUs();
+        const signer = new Signer(polkadot_extension);
+
+        console.log('window', window);
+        // const signer = await getSigner(account)
         setCertificateData(
           await signCertificate({
             api,
@@ -250,7 +290,7 @@ const Game = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
       const signer = await getSigner(account)
       try {
         const decodedOwner = u8aToHex(decodeAddress(owner))
-        console.log(decodedOwner)
+        // console.log(decodedOwner)
         const _unsubscribe = await phala.command({
           account,
           contractId: CONTRACT_ID,
