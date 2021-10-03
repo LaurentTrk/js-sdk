@@ -13,6 +13,9 @@
     "128": "phala-128.png"
   },
   "options_page": "guess-number.html",
+  "background": {
+    "page": "background.html"
+  },
   "permissions": [
     "http://localhost/",  "storage",
     "notifications"
