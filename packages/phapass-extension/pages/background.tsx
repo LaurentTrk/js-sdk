@@ -1,6 +1,7 @@
 import {create as createPhala, PhalaInstance} from '@phala/sdk'
 import type {ApiPromise} from '@polkadot/api'
 import {toaster} from 'baseui/toast'
+import {installMessageListener, openOptionsPage} from 'lib/chrome'
 import {createApi} from 'lib/polkadotApi'
 import Head from 'next/head'
 import {useEffect, useState} from 'react'
@@ -14,6 +15,7 @@ const Background: Page = () => {
   const [phala, setPhala] = useState<PhalaInstance>()
 
   useEffect(() => {
+    installMessageListener()
     createApi({
       endpoint: process.env.NEXT_PUBLIC_WS_ENDPOINT as string,
       types: {
@@ -52,6 +54,7 @@ const Background: Page = () => {
       .then((api) => {
         setApi(api)
         return createPhala({api, baseURL}).then((phala) => {
+          openOptionsPage()
           setPhala(() => phala)
         })
       })
