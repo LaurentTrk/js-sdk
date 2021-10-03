@@ -5,6 +5,6 @@
     "plugin:baseui/recommended"
   ],
   "rules": {
-    "no-console": "error"
+    "no-console": "warning"
   }
 }
