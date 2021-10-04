@@ -12,10 +12,20 @@
   "icons": {
     "128": "phala-128.png"
   },
-  "options_page": "guess-number.html",
+  "options_page": "phapass.html",
   "background": {
     "page": "background.html"
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }
+  ],
   "permissions": [
     "http://localhost/",  "storage",
     "notifications"
