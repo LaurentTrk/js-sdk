@@ -1,6 +1,7 @@
 import {khalaDev} from '@phala/typedefs'
 import {ApiPromise, WsProvider} from '@polkadot/api'
 import {types as phalaSDKTypes} from '@phala/sdk'
+import {types as phaPassTypes} from './phaPassTypes'
 import {RegistryTypes} from '@polkadot/types/types'
 
 export const createApi = async ({
@@ -17,6 +18,7 @@ export const createApi = async ({
     types: {
       ...khalaDev,
       ...phalaSDKTypes,
+      ...phaPassTypes,
       ...types,
     },
   })
