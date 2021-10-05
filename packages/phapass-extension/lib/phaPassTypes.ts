@@ -18,7 +18,7 @@ export const types = {
     PhapassResponseData: {
       _enum: {
         HasAVault: 'bool',
-        ExistingCrdentials: 'PhapassCredential'
+        ExistingCredentials: 'PhapassCredential'
       },
     },
     PhapassRequest: {
