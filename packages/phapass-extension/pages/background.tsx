@@ -1,7 +1,7 @@
 import {create as createPhala, PhalaInstance, CertificateData, randomHex, signCertificate} from '@phala/sdk'
 import {numberToHex, hexAddPrefix, u8aToHex} from '@polkadot/util'
 import type {ApiPromise} from '@polkadot/api'
-import {installMessageListener, openOptionsPage, sendNotification} from 'lib/chrome'
+import {cacheUserAccount, enableOptionsPageDisplayOnButtonClick, getCachedUserAccount, installMessageListener, openOptionsPage, sendNotification} from 'lib/chrome'
 import {createApi} from 'lib/polkadotApi'
 import { enablePolkadotExtension, getSigner } from 'lib/polkadotExtension'
 import Head from 'next/head'
@@ -16,7 +16,8 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
   console.log('BackgroundVaultReady')
 
   useEffect(() => {
-    installMessageListener(onMessage);
+    enableOptionsPageDisplayOnButtonClick()
+    installMessageListener(onMessage)
   })
   
   
@@ -125,18 +126,33 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
   const [account, setAccount] = useState<InjectedAccountWithMeta>()
   
   useEffect(() => {
+    installMessageListener(onMessage)    
     enablePolkadotExtension().then(async (polkadotExtension) => {
       polkadotExtension.approveUs()
-      const accounts =  await polkadotExtension.listAccounts()
-      console.log(accounts)
-      const accountsWithMeta: any[] = accounts.map(({ address, name }) =>
-      ({ address, meta: { name: `${name}` } }));
-      if (!certificate){
-        onSignCertificate(accountsWithMeta[0])
+
+      const cachedUserAccount = await getCachedUserAccount()
+      if (cachedUserAccount && !certificate){
+        onSignCertificate(cachedUserAccount)
+      }else{
+        openOptionsPage()
       }
-      
     })
   })
+
+  const onMessage =  (request: any, sender: any, sendResponse: any) => {
+    console.log(sender.tab ?
+      "from a content script:" + sender.tab.url :
+      "from the extension");
+    console.log('request', request)
+    console.log('certificate', certificate)
+    const sanitizedUrl = sender.tab.url.split('?')[0];
+    if (request.command === "setAccount"){
+      cacheUserAccount(request.account)
+      onSignCertificate(request.account)
+    }
+    return true
+  }
+
 
   const onSignCertificate = async (account: InjectedAccountWithMeta) => {
     if (account) {

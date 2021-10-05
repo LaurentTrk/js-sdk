@@ -60,7 +60,7 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
             signer,
           })
         setCertificateData(certificate)
-        sendMessage({command: "setCertificate", certificate})
+        sendMessage({command: "setAccount", account})
         toaster.positive('Certificate signed', {})
       } catch (err) {
         toaster.negative((err as Error).message, {})
