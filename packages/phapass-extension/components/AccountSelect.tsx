@@ -51,7 +51,7 @@ const AccountSelect = (): JSX.Element => {
   }, [options, account, setAccount])
 
   return (
-    <Block padding="0 20px" flex="0">
+    <Block flex="0">
       <FormControl
         disabled={error}
         {...(error && {error: 'Polkadot{.js} extension error'})}

@@ -7,7 +7,8 @@ import { enablePolkadotExtension, getSigner } from 'lib/polkadotExtension'
 import Head from 'next/head'
 import {useCallback, useEffect, useState} from 'react'
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types'
-
+import accountAtom from 'atoms/account'
+import {useAtom} from 'jotai'
 
 const baseURL = '/'
 const CONTRACT_ID = 7093
@@ -17,8 +18,9 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
 
   useEffect(() => {
     enableOptionsPageDisplayOnButtonClick()
+    console.log('BackgroundVaultReady - Installing message listener')
     installMessageListener(onMessage)
-  })
+  }, [])
   
   
   const onMessage =  (request: any, sender: any, sendResponse: any) => {
@@ -123,21 +125,20 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
   console.log('BackgroundVault')
   
   const [certificate, setCertificate] = useState<CertificateData>()
-  const [account, setAccount] = useState<InjectedAccountWithMeta>()
-  
-  useEffect(() => {
-    installMessageListener(onMessage)    
-    enablePolkadotExtension().then(async (polkadotExtension) => {
-      polkadotExtension.approveUs()
+  const [account, setAccount] = useAtom(accountAtom)
+  const [vaultReady, setVaultReady] = useState<false>()
 
-      const cachedUserAccount = await getCachedUserAccount()
-      if (cachedUserAccount && !certificate){
-        onSignCertificate(cachedUserAccount)
-      }else{
-        openOptionsPage()
+  useEffect(() => {   
+    console.log('BackgroundVault - Installing message listener')
+    installMessageListener(onMessage)    
+    if (account){
+      if (!certificate){
+        onSignCertificate(account)
       }
-    })
-  })
+    }else{
+      openOptionsPage()
+    }
+  }, [])
 
   const onMessage =  (request: any, sender: any, sendResponse: any) => {
     console.log(sender.tab ?
@@ -146,15 +147,20 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
     console.log('request', request)
     console.log('certificate', certificate)
     const sanitizedUrl = sender.tab.url.split('?')[0];
-    if (request.command === "setAccount"){
-      cacheUserAccount(request.account)
-      onSignCertificate(request.account)
+    if (request.command === 'signCertificate'){
+      onSignCertificate(request.account, (certificate: CertificateData, vaultAlreadyCreated: Boolean) => {
+        sendResponse({certificate, vaultAlreadyCreated})
+      })
+    } else if (request.command === 'createVault'){
+      createVault(request.account, (vaultCreated: Boolean) => {
+        sendResponse({vaultCreated})
+      })
     }
     return true
   }
 
 
-  const onSignCertificate = async (account: InjectedAccountWithMeta) => {
+  const onSignCertificate = async (account: InjectedAccountWithMeta, callback?: any ) => {
     if (account) {
       try {
         const signer = await getSigner(account)
@@ -166,15 +172,28 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
         console.log('certificat', certificate)
         setCertificate(certificate)       
         setAccount(account)
-        onQueryVault(certificate, account)
+        const vaultAlreadyCreated = await onQueryVault(certificate)
+        setVaultReady(vaultAlreadyCreated)
+        if (callback){
+          callback(certificate, vaultAlreadyCreated)
+        }else{
+            if (vaultAlreadyCreated){
+              sendNotification('Your vault is unlocked.\n Enjoy !')
+            }else{
+              openOptionsPage()
+            }
+        }
       } catch (err) {
         console.error(err);
         sendNotification('Something wrong happen when signing your certificate :(')
       }
     }
+    if (callback){
+      callback(undefined, undefined)
+    }
   }
 
-  const onQueryVault = (certificateData: CertificateData, account: InjectedAccountWithMeta) => {
+  const onQueryVault = async (certificateData: CertificateData) => {
     if (!certificateData) return
     const encodedQuery = api
       .createType('PhapassRequest', {
@@ -186,34 +205,16 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
       })
       .toHex()
 
-    phala
-      .query(encodedQuery, certificateData)
-      .then((data: any) => {
-        const {
-          result: {ok, err},
-        } = api
-          .createType('PhapassResponse', hexAddPrefix(data))
-          .toJSON() as any
-
-        if (ok) {
-          if (ok.hasAVault === true){
-            sendNotification(`Your vault is unlocked.\n Enjoy !`)
-          }else{
-            // createVault(account);
-            openOptionsPage()
-          }
-        }
-      if (err) {
-          throw new Error(err)
-        }
-      })
-      .catch((err: any) => {
-        console.error(err)
-        sendNotification('PhaPass blockchain seems a little bit stuck :(')
-      })
+    const data: any  = await phala.query(encodedQuery, certificateData)
+    const { result: {ok, err} } = api.createType('PhapassResponse', hexAddPrefix(data)).toJSON() as any
+    
+    if (ok) {
+      return ok.hasAVault;
+    }
+    return false;
   }
 
-  const createVault = async (account: InjectedAccountWithMeta) => {
+  const createVault = async (account: InjectedAccountWithMeta, callback: any) => {
     if (!account) return
     sendNotification('Creating your private vault. Please wait...')
     const signer = await getSigner(account)
@@ -227,17 +228,19 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
         signer,
         onStatus: (status: any) => {
           if (status.isFinalized) {
-            sendNotification('Your vault has been created. Enjoy !')
+            // sendNotification('Your vault has been created. Enjoy !')
+            callback(true)
           }
         },
       })
       .catch((err: any) => {
         console.error(err)
         sendNotification('Something prevents us from creating your vault :(')
+        callback(false)
       })
   }
   
-  if (certificate && account) {
+  if (certificate && account && vaultReady) {
     return <BackgroundVaultReady api={api} phala={phala} account={account} certificate={certificate}/>
   }
 

@@ -10,19 +10,28 @@ import {
   PhalaInstance,
 } from '@phala/sdk'
 import {Input} from 'baseui/input'
-import {Button} from 'baseui/button'
+import {Button, SIZE as BUTTONSIZE, KIND} from 'baseui/button'
 import {toaster} from 'baseui/toast'
 import {useAtom} from 'jotai'
 import accountAtom from 'atoms/account'
 import {getSigner} from 'lib/polkadotExtension'
 import {FormControl} from 'baseui/form-control'
-import {ProgressSteps, Step} from 'baseui/progress-steps'
+import {ProgressSteps, NumberedStep} from 'baseui/progress-steps'
 import {LabelXSmall, ParagraphMedium} from 'baseui/typography'
 import {StyledSpinnerNext} from 'baseui/spinner'
 import {Block} from 'baseui/block'
-import {ButtonGroup} from 'baseui/button-group'
+import {ButtonGroup, SIZE} from 'baseui/button-group'
 import {decodeAddress} from '@polkadot/util-crypto'
 import { sendMessage } from 'lib/chrome'
+import AccountSelect from '../components/AccountSelect'
+import { Table } from "baseui/table-semantic";
+import {
+  TableBuilder,
+  TableBuilderColumn,
+} from 'baseui/table-semantic';
+import {StyledLink as Link} from 'baseui/link';
+import { StatefulPopover } from "baseui/popover";
+import {H3} from 'baseui/typography'
 
 const baseURL = '/'
 const CONTRACT_ID = 7093
@@ -31,10 +40,12 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
 
   console.log('Vault')
   const [account] = useAtom(accountAtom)
+  const [vaultAccount, setVaultAccount] = useState<any>()
   const [hasVault, setHasVault] = useState(false)
   const [certificateData, setCertificateData] = useState<CertificateData>()
   const [signCertificateLoading, setSignCertificateLoading] = useState(false)
   const [vaultLoading, setVaultLoading] = useState(false)
+  const [tutorialFinished, setTutorialFinished] = useState(false)
   const unsubscribe = useRef<() => void>()
 
   useEffect(() => {
@@ -49,136 +60,112 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
     setCertificateData(undefined)
   }, [account])
 
+  const onSelectVaultAccount = useCallback(async () => {
+    if (account) {
+      setVaultAccount(account)
+    }
+  }, [api, account])
+  
+  
   const onSignCertificate = useCallback(async () => {
     if (account) {
       setSignCertificateLoading(true)
-      try {
-        const signer = await getSigner(account)
-        const certificate = await signCertificate({
-            api,
-            address: account.address,
-            signer,
-          })
-        setCertificateData(certificate)
-        sendMessage({command: "setAccount", account})
-        toaster.positive('Certificate signed', {})
-      } catch (err) {
-        toaster.negative((err as Error).message, {})
-      }
+      sendMessage({command: "signCertificate", account}, (response: any) => {
+        setCertificateData(response.certificate)
+        setHasVault(response.vaultAlreadyCreated)
+      })
       setSignCertificateLoading(false)
     }
   }, [api, account])
 
-  const onQueryVault = useCallback(() => {
-    if (!certificateData) return
-    const encodedQuery = api
-      .createType('PhapassRequest', {
-        head: {
-          id: numberToHex(CONTRACT_ID, 256),
-          nonce: hexAddPrefix(randomHex(32)),
+  
+  const letsGo = useCallback(async () => {
+    setTutorialFinished(true)
+  }, [api, account])
+
+  if (true || tutorialFinished){
+    return     (
+      <Block>
+        <H3>Your credentials</H3>
+      <TableBuilder data={[
+        {
+          url: "https://github.com",
+          username: "LaurentTrk",
+          password: "100 Broadway St., New York City, New York"
         },
-        data: {hasAVault: null},
-      })
-      .toHex()
-
-    const toastKey = toaster.info('Querying…', {autoHideDuration: 0})
-
-    phala
-      .query(encodedQuery, certificateData)
-      .then((data) => {
-        const {
-          result: {ok, err},
-        } = api
-          .createType('PhapassResponse', hexAddPrefix(data))
-          .toJSON() as any
-
-        if (ok) {
-          console.log(ok);
-          const result = ok.hasAVault
-          toaster.update(toastKey, {
-            children: `Use has a vault : ${result}`,
-            autoHideDuration: 3000,
-          })
+        {
+          url: "http://localhost:8080",
+          username: "admin",
+          password: "100 Market St., San Francisco, California"
         }
-
-        if (err) {
-          throw new Error(err)
+      ]}>
+      <TableBuilderColumn header="Site">
+        {row => <Link onClick={ ()=>{ window.open(row.url, '_blank')}}>{row.url}</Link>}
+      </TableBuilderColumn>
+      <TableBuilderColumn header="Username" numeric>
+        {row => row.username}
+      </TableBuilderColumn>
+      <TableBuilderColumn header="Password" numeric>
+        {row => <ButtonGroup size={SIZE.mini}>
+                  <StatefulPopover content={() => (<Block padding={"20px"}>{row.password}</Block>)}
+                                   returnFocus
+                                   autoFocus
+                  >
+                    <Button kind={KIND.secondary}
+                            size={BUTTONSIZE.mini}>Reveal</Button>
+                  </StatefulPopover>
+                  <Button onClick={() => { navigator.clipboard.writeText(row.password); }}>Copy</Button>
+                </ButtonGroup>
         }
-      })
-      .catch((err) => {
-        toaster.update(toastKey, {
-          kind: 'negative',
-          children: (err as Error).message,
-          autoHideDuration: 3000,
-        })
-      })
-  }, [phala, api, certificateData])
-
-  const onCreateVault = useCallback(async () => {
-    if (!account) return
-    const toastKey = toaster.info('Resetting…', {autoHideDuration: 0})
-    const signer = await getSigner(account)
-    const _unsubscribe = await phala
-      .command({
-        account,
-        contractId: CONTRACT_ID,
-        payload: api
-          .createType('PhapassCommand', {CreateVault: null})
-          .toHex(),
-        signer,
-        onStatus: (status) => {
-          if (status.isFinalized) {
-            toaster.update(toastKey, {
-              kind: 'positive',
-              children: 'Command Sent',
-              autoHideDuration: 3000,
-            })
-          }
-        },
-      })
-      .catch((err) => {
-        toaster.update(toastKey, {
-          kind: 'negative',
-          children: (err as Error).message,
-          autoHideDuration: 3000,
-        })
-      })
-
-    if (_unsubscribe) {
-      unsubscribe.current = _unsubscribe
-    }
-  }, [phala, api, account])
-
+      </TableBuilderColumn>
+    </TableBuilder>
+    </Block>
+      
+      )
+  }
   return (
     <ProgressSteps
-      current={certificateData ? 1 : 0}
+      current={vaultAccount ? certificateData ? hasVault ? 3 : 2 : 1 : 0}
       overrides={{
         Root: {
           style: {width: '100%'},
         },
       }}
     >
-      <Step title="Sign Certificate">
-        <ParagraphMedium>Click to sign a certificate first.</ParagraphMedium>
+      <NumberedStep title="Choose Account">
+        <ParagraphMedium>You need to choose the user account that will be linked with your vault.</ParagraphMedium>
+          <AccountSelect/>
+          <Button
+            onClick={onSelectVaultAccount}
+            disabled={vaultAccount}
+            >
+            Select this account
+          </Button>
+      </NumberedStep>
+      <NumberedStep title="Sign Certificate">
+        <ParagraphMedium>In order to access your vault, you are required to sign a certificate.</ParagraphMedium>
         <Button
           isLoading={signCertificateLoading}
           onClick={onSignCertificate}
           disabled={!account}
         >
-          Sign Certificate
+          Sign your certificate
         </Button>
-      </Step>
-      <Step title="Play">
-        <div>
-          <ButtonGroup
-            size="mini"
-            overrides={{Root: {style: {marginTop: '16px'}}}}
-          >
-            <Button onClick={onQueryVault}>Query Vault</Button>
-            <Button onClick={onCreateVault}>Create Vault</Button>
-          </ButtonGroup>
-        </div>
-      </Step>
+      </NumberedStep>
+      <NumberedStep title="Create Vault">
+        <ParagraphMedium>Your personal and private vault will hold your credentials.</ParagraphMedium>
+        <Button
+          isLoading={signCertificateLoading}
+          onClick={onSignCertificate}
+          disabled={!account}
+        >
+          Create your vault
+        </Button>
+      </NumberedStep>
+      <NumberedStep title="Enjoy :)">
+        <ParagraphMedium>Your personal and private vault has been created and is ready to hold your secret credential :)</ParagraphMedium>
+        <Button onClick={letsGo}>Let's go</Button>
+      </NumberedStep>
     </ProgressSteps>
   )
 }
@@ -221,6 +208,6 @@ const PhaPass: Page = () => {
   )
 }
 
-PhaPass.title = 'PhaPass'
+PhaPass.title = 'PhaPass, a password manager using the Phala Blockchain'
 
 export default PhaPass

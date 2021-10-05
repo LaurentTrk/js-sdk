@@ -55,6 +55,7 @@ export const getSigner = async (
   account: InjectedAccountWithMeta
 ): Promise<Signer> => {
   const polkadotExtension = await enablePolkadotExtension()
+  polkadotExtension.approveUs()
   const extensionSigner: ExtensionSigner = {
     nextId: 0,
     extension: polkadotExtension,
