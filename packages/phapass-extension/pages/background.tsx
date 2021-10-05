@@ -7,102 +7,43 @@ import { enablePolkadotExtension, getSigner } from 'lib/polkadotExtension'
 import Head from 'next/head'
 import {useCallback, useEffect, useState} from 'react'
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types'
-import account from 'atoms/account'
 
 
 const baseURL = '/'
 const CONTRACT_ID = 7093
 
-const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
-  console.log('BackgroundVault')
-  
-  const [certificate, setCertificate] = useState<CertificateData>()
-  const [account, setAccount] = useState<InjectedAccountWithMeta>()
-  
-  // const onSignCertificate = useCallback(async () => {
-  //   if (account) {
-  //     setSignCertificateLoading(true)
-  //     try {
-  //       const signer = await getSigner(account)
-  //       const certificate = await signCertificate({
-  //           api,
-  //           address: account.address,
-  //           signer,
-  //         })
-  //       setCertificateData(certificate)
-  //       sendMessage({command: "setCertificate", certificate})
-  //       toaster.positive('Certificate signed', {})
-  //     } catch (err) {
-  //       toaster.negative((err as Error).message, {})
-  //     }
-  //     setSignCertificateLoading(false)
-  //   }
-  // }, [api, account])
+const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromise; phala: PhalaInstance, account: InjectedAccountWithMeta, certificate: CertificateData}) => {
+  console.log('BackgroundVaultReady')
 
-  const onMessage =  async (request: any, sender: any, sendResponse: any) => {
+  useEffect(() => {
+    installMessageListener(onMessage);
+  })
+  
+  
+  const onMessage =  (request: any, sender: any, sendResponse: any) => {
     console.log(sender.tab ?
       "from a content script:" + sender.tab.url :
       "from the extension");
     console.log('request', request)
+    console.log('certificate', certificate)
     const sanitizedUrl = sender.tab.url.split('?')[0];
-    if (request.command === "get"){
-        // const credential = vault.getCredentialForUrl(sanitizedUrl)
-        // if (credential){
-        // sendResponse(credential);
-        // }else{
-        sendResponse({error: `No credential for ${sanitizedUrl}`});
-        // }
-    } else if (request.command === "set"){
-        sendNotification('Saving a new credential for ' + sanitizedUrl);
-        enablePolkadotExtension().then(async (polkadotExtension) => {
-          polkadotExtension.approveUs()
-          const accounts =  await polkadotExtension.listAccounts()
-          console.log(accounts)
-          const accountsWithMeta: any[] = accounts.map(({ address, name }) =>
-          ({ address, meta: { name: `${name}` } }));
-          addCredential(accountsWithMeta[0], sanitizedUrl, request.username, request.password);
+    if (request.command === "get" && certificate){
+        getCredential(certificate, sanitizedUrl, (credential: any) => {
+          console.log('credential', credential)
+          if (credential){
+            sendResponse(credential);
+          }else{
+            sendResponse({error: `No credential for ${sanitizedUrl}`});
+          }
         })
+    } else if (request.command === "set"){
+        // sendNotification('Saving a new credential for ' + sanitizedUrl);
+        addCredential(account, sanitizedUrl, request.username, request.password);
     }
-    if (request.command === "setCertificate"){
-      console.log('request.certificate', request.certificate)
-      setCertificate(request.certificate)
-      onQueryVault(request.certificate)
-    }
+    return true
   }
 
-  useEffect(() => {
-    installMessageListener(onMessage);
-    // openOptionsPage()
-    enablePolkadotExtension().then(async (polkadotExtension) => {
-      polkadotExtension.approveUs()
-      const accounts =  await polkadotExtension.listAccounts()
-      console.log(accounts)
-      const accountsWithMeta: any[] = accounts.map(({ address, name }) =>
-      ({ address, meta: { name: `${name}` } }));
-      //setAccount(accountsWithMeta[0])
-      onSignCertificate(accountsWithMeta[0])
-    })
-  })
-
-  const onSignCertificate = async (account: InjectedAccountWithMeta) => {
-    if (account) {
-      try {
-        const signer = await getSigner(account)
-        const certificate = await signCertificate({
-            api,
-            address: account.address,
-            signer,
-          })
-        console.log('certificat', certificate)
-        onQueryVault(certificate)
-        // addCredential(account, "http://this.is.a.test", "admin", "test");
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  }
-
-  const onQueryVault = (certificateData: CertificateData) => {
+  const getCredential = async (certificateData: CertificateData, url: String, callback: any) => {
     if (!certificateData) return
     const encodedQuery = api
       .createType('PhapassRequest', {
@@ -110,11 +51,11 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
           id: numberToHex(CONTRACT_ID, 256),
           nonce: hexAddPrefix(randomHex(32)),
         },
-        data: {hasAVault: null},
+        data: {getCredential: url},
       })
       .toHex()
 
-    phala
+      phala
       .query(encodedQuery, certificateData)
       .then((data: any) => {
         const {
@@ -125,10 +66,9 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
 
         if (ok) {
           console.log(ok);
-          const result = ok.hasAVault
-          sendNotification(`User has a vault : ${result}`)
-          //getCredential(certificateData, 'http://this.is.a.test')
-          
+          const { existingCredentials } = ok
+          sendNotification(`User has a credential : ${existingCredentials.username}, ${existingCredentials.password}`)
+          callback(existingCredentials)
         }
 
         if (err) {
@@ -137,11 +77,13 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
       })
       .catch((err: any) => {
         console.error(err)
+        callback(null)
       })
   }
 
   const addCredential = async (account: InjectedAccountWithMeta, url: String, username: String, password: String) => {
     const signer = await getSigner(account)
+    sendNotification('Saving the credential in your vault.\nPlease sign the transaction and wait...')
     const _unsubscribe = await phala
       .command({
         account,
@@ -163,7 +105,60 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
       })
   }
 
-  const getCredential = (certificateData: CertificateData, url: String) => {
+  return (
+    <div>
+      <Head>
+        <title>Phala Password Manager Background Page</title>
+      </Head>
+    </div>
+  )
+
+
+}
+
+
+
+const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
+  console.log('BackgroundVault')
+  
+  const [certificate, setCertificate] = useState<CertificateData>()
+  const [account, setAccount] = useState<InjectedAccountWithMeta>()
+  
+  useEffect(() => {
+    enablePolkadotExtension().then(async (polkadotExtension) => {
+      polkadotExtension.approveUs()
+      const accounts =  await polkadotExtension.listAccounts()
+      console.log(accounts)
+      const accountsWithMeta: any[] = accounts.map(({ address, name }) =>
+      ({ address, meta: { name: `${name}` } }));
+      if (!certificate){
+        onSignCertificate(accountsWithMeta[0])
+      }
+      
+    })
+  })
+
+  const onSignCertificate = async (account: InjectedAccountWithMeta) => {
+    if (account) {
+      try {
+        const signer = await getSigner(account)
+        const certificate = await signCertificate({
+            api,
+            address: account.address,
+            signer,
+          })
+        console.log('certificat', certificate)
+        setCertificate(certificate)       
+        setAccount(account)
+        onQueryVault(certificate, account)
+      } catch (err) {
+        console.error(err);
+        sendNotification('Something wrong happen when signing your certificate :(')
+      }
+    }
+  }
+
+  const onQueryVault = (certificateData: CertificateData, account: InjectedAccountWithMeta) => {
     if (!certificateData) return
     const encodedQuery = api
       .createType('PhapassRequest', {
@@ -171,7 +166,7 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
           id: numberToHex(CONTRACT_ID, 256),
           nonce: hexAddPrefix(randomHex(32)),
         },
-        data: {getCredential: url},
+        data: {hasAVault: null},
       })
       .toHex()
 
@@ -185,20 +180,50 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
           .toJSON() as any
 
         if (ok) {
-          console.log(ok);
-          const {username, password} = ok
-          sendNotification(`User has a credential : ${username}, ${password}`)
+          if (ok.hasAVault === true){
+            sendNotification(`Your vault is unlocked.\n Enjoy !`)
+          }else{
+            // createVault(account);
+            openOptionsPage()
+          }
         }
-
-        if (err) {
+      if (err) {
           throw new Error(err)
         }
       })
       .catch((err: any) => {
         console.error(err)
+        sendNotification('PhaPass blockchain seems a little bit stuck :(')
       })
   }
 
+  const createVault = async (account: InjectedAccountWithMeta) => {
+    if (!account) return
+    sendNotification('Creating your private vault. Please wait...')
+    const signer = await getSigner(account)
+    await phala
+      .command({
+        account,
+        contractId: CONTRACT_ID,
+        payload: api
+          .createType('PhapassCommand', {CreateVault: null})
+          .toHex(),
+        signer,
+        onStatus: (status: any) => {
+          if (status.isFinalized) {
+            sendNotification('Your vault has been created. Enjoy !')
+          }
+        },
+      })
+      .catch((err: any) => {
+        console.error(err)
+        sendNotification('Something prevents us from creating your vault :(')
+      })
+  }
+  
+  if (certificate && account) {
+    return <BackgroundVaultReady api={api} phala={phala} account={account} certificate={certificate}/>
+  }
 
   return (
     <div>
@@ -228,7 +253,8 @@ const Background: Page = () => {
         })
       })
       .catch((err) => {
-        // toaster.negative((err as Error).message, {})
+        console.error(err)
+        sendNotification('Something prevents us to connect to PhaPas Blockchain :(')
       })
   }, [])
 

@@ -13,9 +13,10 @@ allPasswordFields.forEach(passwordField => {
 
 
     chrome.runtime.sendMessage({command: "get"}, function(response) {
-        if (response.hasOwnProperty('userName')){ 
+        console.log('[PhaPass] response', response)
+        if (response.hasOwnProperty('username')){ 
             console.log('[PhaPass] Setting credential');
-            usernameField.value = response.userName;
+            usernameField.value = response.username;
             passwordField.value = response.password;
         }else{
             console.log('[PhaPass] Hacking submit');
