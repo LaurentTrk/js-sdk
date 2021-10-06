@@ -1,6 +1,7 @@
 import type { InjectedAccount, InjectedAccountWithMeta } from '@polkadot/extension-inject/types'
 import { Signer, SignerPayloadJSON, SignerPayloadRaw } from '@polkadot/types/types'
 import { connectExtension } from './chrome'
+import { u8aToHex, hexToU8a} from '@polkadot/util'
 
 // As we are using the Polkadot extension from another extension (the PhaPass one),
 // we can't use the classic way (https://polkadot.js.org/docs/extension/usage) : extension are not injected in others extensions
@@ -49,11 +50,12 @@ interface PolkadotExtension {
 interface ExtensionSigner extends Signer {
   extension: PolkadotExtension
   nextId : number
+  decryptBytes: (bytesToEncrypt: Uint8Array, recipientPublicKey: Uint8Array) => Promise<Uint8Array>
 }
 
 export const getSigner = async (
   account: InjectedAccountWithMeta
-): Promise<Signer> => {
+): Promise<ExtensionSigner> => {
   const polkadotExtension = await enablePolkadotExtension()
   polkadotExtension.approveUs()
   const extensionSigner: ExtensionSigner = {
@@ -75,14 +77,17 @@ export const getSigner = async (
         ...result,
         id
       };    
+    },
+    async decryptBytes(bytesToEncrypt: Uint8Array, recipientPublicKey: Uint8Array){
+        const id = ++this.nextId;
+        const result = await this.extension.sendRequest(id, 'pub(bytes.decrypt)', 
+                            {"origin":this.extension.origin, "data": u8aToHex(bytesToEncrypt),  "type": 'bytes', 
+                            "address": account.address, "recipientPublicKey": u8aToHex(recipientPublicKey)});
+        return hexToU8a(result.decrypted);
     }
+
   }
   return extensionSigner
 }
 
-  // async decryptBytes(userAccount: KeyPair, bytesToEncrypt, recipientPublicKey){
-  //     const id = ++this.nextId;
-  //     const result = await this.sendRequest(id, 'pub(bytes.decrypt)', {"origin":this.origin, "data": u8aToHex(bytesToEncrypt),  "type": 'bytes', 
-  //                         "address": userAccount.address, "recipientPublicKey": u8aToHex(recipientPublicKey)});
-  //     return hexToU8a(result.decrypted);
-  // }
+

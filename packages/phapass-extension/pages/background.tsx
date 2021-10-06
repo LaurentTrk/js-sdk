@@ -1,5 +1,5 @@
 import {create as createPhala, PhalaInstance, CertificateData, randomHex, signCertificate} from '@phala/sdk'
-import {numberToHex, hexAddPrefix, u8aToHex} from '@polkadot/util'
+import {numberToHex, hexAddPrefix, u8aToHex, u8aConcat, hexToU8a, stringToU8a, u8aToString, hexToString} from '@polkadot/util'
 import type {ApiPromise} from '@polkadot/api'
 import {cacheUserAccount, enableOptionsPageDisplayOnButtonClick, getCachedUserAccount, installMessageListener, openOptionsPage, sendNotification} from 'lib/chrome'
 import {createApi} from 'lib/polkadotApi'
@@ -8,21 +8,67 @@ import Head from 'next/head'
 import {useCallback, useEffect, useState} from 'react'
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types'
 import accountAtom from 'atoms/account'
+import vaultPublicKeyAtom from 'atoms/vaultPublicKey'
+import vaultSecretKeysAtom from 'atoms/vaultSecretKeys'
 import {useAtom} from 'jotai'
+import { HexString } from '@polkadot/util/types'
+import { createVaultSecrets, decryptPassword, decryptVaultSecrets, encryptPassword } from 'lib/crypto'
+const {
+  mnemonicGenerate,
+  mnemonicToMiniSecret,
+  naclKeypairFromSeed,
+  decodeAddress,
+  naclDecrypt,
+  naclEncrypt,
+  randomAsU8a,
+  convertPublicKeyToCurve25519, convertSecretKeyToCurve25519, naclSeal
+} = require('@polkadot/util-crypto');  
 
 const baseURL = '/'
 const CONTRACT_ID = 7093
 
+let theVaultSecret: Uint8Array|undefined = undefined
+
 const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromise; phala: PhalaInstance, account: InjectedAccountWithMeta, certificate: CertificateData}) => {
   console.log('BackgroundVaultReady')
+
+  // Public and encrypted keys are stored in local storage
+  const [vaultPublicKey, setVaultPublicKey] = useAtom(vaultPublicKeyAtom)
+  const [vaultSecretKeys, setVaultSecretKeys] = useAtom(vaultSecretKeysAtom)
+
+  // Private values (after decryption) are stored in memory
+  // const [vaultSecret, setVaultSecret] = useState<Uint8Array>()
+  const [vaultPrivateKey, setVaultPrivateKey] = useState<Uint8Array>()
 
   useEffect(() => {
     enableOptionsPageDisplayOnButtonClick()
     console.log('BackgroundVaultReady - Installing message listener')
     installMessageListener(onMessage)
+    setVaultSecrets(account);
   }, [])
   
-  
+  useEffect(() => {
+    if (theVaultSecret){
+      const password = "This.is.a.long.secret.to.be.kept.secret"
+      const encryptedPassword = encryptPassword(password, theVaultSecret)
+      console.log('password', decryptPassword(encryptedPassword, theVaultSecret))
+    }
+  }, [])
+    
+  const setVaultSecrets = async (account: InjectedAccountWithMeta) => {
+    if (!vaultPublicKey || !vaultSecretKeys){
+      const { vaultKeyPair, vaultEncryptedKeys, vaultSecret } = createVaultSecrets(account)
+      setVaultPublicKey(u8aToHex(vaultKeyPair.publicKey));
+      setVaultPrivateKey(vaultKeyPair.secretKey);
+      setVaultSecretKeys(u8aToHex(vaultEncryptedKeys));
+      theVaultSecret = vaultSecret;
+    }else{
+      const { decryptedVaultSecret, decryptedVaultSecretKey } = await decryptVaultSecrets(account, vaultSecretKeys, vaultPublicKey)
+      theVaultSecret = decryptedVaultSecret;
+      setVaultPrivateKey(decryptedVaultSecretKey);
+    }
+  }  
+
   const onMessage =  (request: any, sender: any, sendResponse: any) => {
     console.log(sender.tab ?
       "from a content script:" + sender.tab.url :
@@ -70,7 +116,12 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
         if (ok) {
           console.log(ok);
           const { existingCredentials } = ok
-          sendNotification(`User has a credential : ${existingCredentials.username}, ${existingCredentials.password}`)
+          console.log('existingCredentials.password', existingCredentials.password)
+          if (theVaultSecret){
+            existingCredentials.password = decryptPassword('0x' + existingCredentials.password, theVaultSecret)
+          }
+          
+          sendNotification(`Injecting your existing credential !`)
           callback(existingCredentials)
         }
 
@@ -84,7 +135,10 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
       })
   }
 
-  const addCredential = async (account: InjectedAccountWithMeta, url: String, username: String, password: String) => {
+  const addCredential = async (account: InjectedAccountWithMeta, url: string, username: string, password: string) => {
+    
+    const encryptedPassword = theVaultSecret ? encryptPassword(password, theVaultSecret):undefined
+    console.log('encryptedPassword', encryptedPassword as string)
     const signer = await getSigner(account)
     sendNotification('Saving the credential in your vault.\nPlease sign the transaction and wait...')
     const _unsubscribe = await phala
@@ -93,7 +147,7 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
         contractId: CONTRACT_ID,
         payload: api
           .createType('PhapassCommand', {AddCredential: {
-            'url': url, 'username': username, 'password': password
+            'url': url, 'username': username, 'password': encryptedPassword?.slice(2)
           }})
           .toHex(),
         signer,

@@ -73,17 +73,27 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
       sendMessage({command: "signCertificate", account}, (response: any) => {
         setCertificateData(response.certificate)
         setHasVault(response.vaultAlreadyCreated)
+        setSignCertificateLoading(false)  
       })
-      setSignCertificateLoading(false)
+      
     }
   }, [api, account])
 
-  
+  const onCreateVault = useCallback(async () => {
+    if (account) {
+      setVaultLoading(true)
+      sendMessage({command: "createVault", account}, (response: any) => {
+        setHasVault(response.vaultCreated)
+      })
+      setVaultLoading(false)
+    }
+  }, [api, account])
+
   const letsGo = useCallback(async () => {
     setTutorialFinished(true)
   }, [api, account])
 
-  if (true || tutorialFinished){
+  if (tutorialFinished){
     return     (
       <Block>
         <H3>Your credentials</H3>
@@ -155,8 +165,8 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
       <NumberedStep title="Create Vault">
         <ParagraphMedium>Your personal and private vault will hold your credentials.</ParagraphMedium>
         <Button
-          isLoading={signCertificateLoading}
-          onClick={onSignCertificate}
+          isLoading={vaultLoading}
+          onClick={onCreateVault}
           disabled={!account}
         >
           Create your vault
