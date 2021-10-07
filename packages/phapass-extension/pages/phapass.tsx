@@ -46,7 +46,17 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
   const [signCertificateLoading, setSignCertificateLoading] = useState(false)
   const [vaultLoading, setVaultLoading] = useState(false)
   const [tutorialFinished, setTutorialFinished] = useState(false)
+  const [credentials, setCredentials] = useState<any>()
   const unsubscribe = useRef<() => void>()
+
+  useEffect(() => {
+    sendMessage({command: "status"}, (response: any) => {
+      console.log('status', response)
+      if (response.hasVault === true){
+        setTutorialFinished(true)
+      }
+    })
+  }, [])
 
   useEffect(() => {
     const _unsubscribe = unsubscribe.current
@@ -59,6 +69,13 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
   useEffect(() => {
     setCertificateData(undefined)
   }, [account])
+
+  useEffect(() => {
+    sendMessage({command: "list"}, (response: any) => {
+      setCredentials(response)
+    })
+  }, [tutorialFinished])
+
 
   const onSelectVaultAccount = useCallback(async () => {
     if (account) {
@@ -82,7 +99,7 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
   const onCreateVault = useCallback(async () => {
     if (account) {
       setVaultLoading(true)
-      sendMessage({command: "createVault", account}, (response: any) => {
+      sendMessage({command: "createVault", account, certificate: certificateData}, (response: any) => {
         setHasVault(response.vaultCreated)
       })
       setVaultLoading(false)
@@ -93,22 +110,30 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
     setTutorialFinished(true)
   }, [api, account])
 
-  if (tutorialFinished){
+  const copyPasswordToClipboard = (url: string) => {
+    sendMessage({command: "get", url}, (credential: any) => {
+      navigator.clipboard.writeText(credential.password);
+    })
+  }
+
+  const revealPassword = (url: string) => {
+    // navigator.clipboard.writeText(row.username);
+  }
+
+  const forgetPassword = (url: string) => {
+    sendMessage({command: "remove", url}, () => {
+      console.log('Got remove credential answer')
+      sendMessage({command: "list"}, (response: any) => {
+        setCredentials(response)
+      })
+    })
+  }
+
+  if (tutorialFinished && credentials){
     return     (
       <Block>
         <H3>Your credentials</H3>
-      <TableBuilder data={[
-        {
-          url: "https://github.com",
-          username: "LaurentTrk",
-          password: "100 Broadway St., New York City, New York"
-        },
-        {
-          url: "http://localhost:8080",
-          username: "admin",
-          password: "100 Market St., San Francisco, California"
-        }
-      ]}>
+      <TableBuilder data={credentials}>
       <TableBuilderColumn header="Site">
         {row => <Link onClick={ ()=>{ window.open(row.url, '_blank')}}>{row.url}</Link>}
       </TableBuilderColumn>
@@ -117,14 +142,16 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
       </TableBuilderColumn>
       <TableBuilderColumn header="Password" numeric>
         {row => <ButtonGroup size={SIZE.mini}>
-                  <StatefulPopover content={() => (<Block padding={"20px"}>{row.password}</Block>)}
+                  {/* <StatefulPopover content={() => (<Block padding={"20px"}>{row.username}</Block>)}
                                    returnFocus
                                    autoFocus
                   >
                     <Button kind={KIND.secondary}
                             size={BUTTONSIZE.mini}>Reveal</Button>
-                  </StatefulPopover>
-                  <Button onClick={() => { navigator.clipboard.writeText(row.password); }}>Copy</Button>
+                  </StatefulPopover> */}
+                  <Button onClick={() => { revealPassword(row.url) }}>Reveal</Button>
+                  <Button onClick={() => { copyPasswordToClipboard(row.url) }}>Copy</Button>
+                  <Button onClick={() => { forgetPassword(row.url) }}>Forget</Button>
                 </ButtonGroup>
         }
       </TableBuilderColumn>
@@ -213,7 +240,7 @@ const PhaPass: Page = () => {
       justifyContent="center"
     >
       <StyledSpinnerNext />
-      <LabelXSmall marginTop="20px">Initializing</LabelXSmall>
+      <LabelXSmall marginTop="20px">Please wait till we get connected to your personal vault :)</LabelXSmall>
     </Block>
   )
 }

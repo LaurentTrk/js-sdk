@@ -9,16 +9,21 @@ export const types = {
       username: 'String',
       password: 'String',
     },
+    ListedCredential: {
+      url: 'String',
+      username: 'String',
+    },
     PhapassError: {
       _enum: ['OriginUnavailable', 'VaultAlreadyExists', 'NoVault', 'NoCredential', 'NotAuthorized'],
     },
     PhapassRequestData: {
-      _enum: {HasAVault: null, GetCredential: 'String'},
+      _enum: {HasAVault: null, GetCredential: 'String', ListCredentials: null},
     },
     PhapassResponseData: {
       _enum: {
         HasAVault: 'bool',
-        ExistingCredentials: 'PhapassCredential'
+        ExistingCredentials: 'PhapassCredential',
+        Credentials: 'Vec<ListedCredential>'
       },
     },
     PhapassRequest: {
@@ -30,6 +35,6 @@ export const types = {
       result: 'Result<PhapassResponseData, PhapassError>',
     },
     PhapassCommand: {
-      _enum: {CreateVault: null, AddCredential: 'UrlCredential'},
+      _enum: {CreateVault: null, AddCredential: 'UrlCredential', RemoveCredential: 'String'},
     },
   }
