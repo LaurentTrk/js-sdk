@@ -381,7 +381,7 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
 
   const createVault = async (account: InjectedAccountWithMeta, certificate: CertificateData, callback: any) => {
     if (!account) return
-    sendNotification('Creating your private vault. Please wait...')
+    let notificationId = await sendLengthyNotification('Please sign the transaction to create your vault.')
     const signer = await getSigner(account)
     await phala
       .command({
@@ -391,7 +391,7 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
           .createType('PhapassCommand', {CreateVault: null})
           .toHex(),
         signer,
-        onStatus: (status: any) => {
+        onStatus: async (status: any) => {
           if (status.isFinalized) {
             // sendNotification('Your vault has been created. Enjoy !')
             console.log('createVault certificate', certificate)
@@ -399,11 +399,16 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
             vaultState.vaultReady = true
             setAccount(account)
             callback(true)
+            closeNotification(notificationId)
+          }else if (!status.isCompleted) {
+            closeNotification(notificationId)
+            notificationId = await sendLengthyNotification('Please wait, your vault is being created...')
           }
         },
       })
       .catch((err: any) => {
         console.error(err)
+        closeNotification(notificationId)
         sendNotification('Something prevents us from creating your vault :(')
         callback(false)
       })
