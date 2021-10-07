@@ -149,8 +149,6 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
           if (vaultState.secret){
             existingCredentials.password = decryptPassword('0x' + existingCredentials.password, vaultState.secret)
           }
-          
-          sendNotification(`Injecting your existing credential !`)
           callback(existingCredentials)
         }
 
