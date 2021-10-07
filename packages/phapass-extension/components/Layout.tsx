@@ -78,7 +78,7 @@ const Layout: FC<{title?: string}> = ({title, children}) => {
       
       </HeaderNavigation>
 
-      <Block width="100%" maxWidth="700px" margin="0 auto" padding="0 10px">
+      <Block width="100%" maxWidth="1000px" margin="0 auto" padding="0 10px">
         <Block
           as="header"
           height="120px"
