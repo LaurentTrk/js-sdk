@@ -31,7 +31,13 @@ import {
 } from 'baseui/table-semantic';
 import {StyledLink as Link} from 'baseui/link';
 import { StatefulPopover } from "baseui/popover";
-import {H3} from 'baseui/typography'
+import {H4} from 'baseui/typography'
+import {
+  Card,
+  StyledBody,
+  StyledAction
+} from "baseui/card";
+import { Alert } from 'baseui/icon'
 
 const baseURL = '/'
 const CONTRACT_ID = 7093
@@ -129,38 +135,61 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
     })
   }
 
-  if (tutorialFinished && credentials){
-    return     (
+  if (tutorialFinished){
+    return (
       <Block>
-        <H3>Your credentials</H3>
-      <TableBuilder data={credentials}>
-      <TableBuilderColumn header="Site">
-        {row => <Link onClick={ ()=>{ window.open(row.url, '_blank')}}>{row.url}</Link>}
-      </TableBuilderColumn>
-      <TableBuilderColumn header="Username" numeric>
-        {row => row.username}
-      </TableBuilderColumn>
-      <TableBuilderColumn header="Password" numeric>
-        {row => <ButtonGroup size={SIZE.mini}>
-                  {/* <StatefulPopover content={() => (<Block padding={"20px"}>{row.username}</Block>)}
-                                   returnFocus
-                                   autoFocus
-                  >
-                    <Button kind={KIND.secondary}
-                            size={BUTTONSIZE.mini}>Reveal</Button>
-                  </StatefulPopover> */}
-                  <Button onClick={() => { revealPassword(row.url) }}>Reveal</Button>
-                  <Button onClick={() => { copyPasswordToClipboard(row.url) }}>Copy</Button>
-                  <Button onClick={() => { forgetPassword(row.url) }}>Forget</Button>
-                </ButtonGroup>
+        <StyledBody>
+          <b>Welcome to PhaPass</b>, the password manager which stores your secret credentials in the <a href='https://phala.network/'>Phala Blockchain</a>.<br/>
+          <br/>
+          Your personal and private vault is unlocked and ready to store the credential you will used during your browsing sessions.<br/>
+          Enjoy !
+        </StyledBody>
+        <H4>Your credentials</H4>
+        {(!credentials || credentials.length == 0)&& 
+        <div>
+          <StyledBody>
+          No credential has been stored yet. 
+          </StyledBody>
+          <Button onClick={ () => { window.open("http://localhost:8080/auth/admin/", '_blank')}}>Let's visit our testing login page !</Button>
+          </div>
         }
-      </TableBuilderColumn>
-    </TableBuilder>
+        {credentials && credentials.length > 0 && 
+          <TableBuilder data={credentials}>
+           <TableBuilderColumn header="Site">
+              {row => <Link onClick={ ()=>{ window.open(row.url, '_blank')}}>{row.url}</Link>}
+            </TableBuilderColumn>
+            <TableBuilderColumn header="Username" numeric>
+              {row => row.username}
+            </TableBuilderColumn>
+            <TableBuilderColumn header="Password" numeric>
+              {row => <ButtonGroup size={SIZE.mini}>
+                        {/* <StatefulPopover content={() => (<Block padding={"20px"}>{row.username}</Block>)}
+                                        returnFocus
+                                        autoFocus
+                        >
+                          <Button kind={KIND.secondary}
+                                  size={BUTTONSIZE.mini}>Reveal</Button>
+                        </StatefulPopover> */}
+                        <Button onClick={() => { revealPassword(row.url) }}>Reveal</Button>
+                        <Button onClick={() => { copyPasswordToClipboard(row.url) }}>Copy</Button>
+                        <Button onClick={() => { forgetPassword(row.url) }}>Forget</Button>
+                      </ButtonGroup>
+              }
+            </TableBuilderColumn>
+          </TableBuilder>
+        }
+      <Disclaimer/>
     </Block>
-      
-      )
+    )
   }
   return (
+    <div>
+      <StyledBody>
+        <b>Welcome to PhaPass</b>, the password manager which stores your secret credentials in the <a href='https://phala.network/'>Phala Blockchain</a>.<br/>
+        It seems that your private vault has not been created yet, the following tutorial will help you to get started !.<br/>
+      </StyledBody>
+
+
     <ProgressSteps
       current={vaultAccount ? certificateData ? hasVault ? 3 : 2 : 1 : 0}
       overrides={{
@@ -170,7 +199,7 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
       }}
     >
       <NumberedStep title="Choose Account">
-        <ParagraphMedium>You need to choose the user account that will be linked with your vault.</ParagraphMedium>
+        <ParagraphMedium>You need to choose the user account that will be linked to your vault.</ParagraphMedium>
           <AccountSelect/>
           <Button
             onClick={onSelectVaultAccount}
@@ -200,10 +229,32 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
         </Button>
       </NumberedStep>
       <NumberedStep title="Enjoy :)">
-        <ParagraphMedium>Your personal and private vault has been created and is ready to hold your secret credential :)</ParagraphMedium>
+        <ParagraphMedium>Your personal and private vault has been created and is ready to hold your secret credentials :)</ParagraphMedium>
         <Button onClick={letsGo}>Let's go</Button>
       </NumberedStep>
     </ProgressSteps>
+    <Disclaimer/>
+    </div>
+  )
+}
+
+const Disclaimer = () => {
+  return (  
+    <Block
+    position="absolute"
+    bottom="40px"
+    alignItems="center"
+    justifyContent="space-between"
+  >
+    <Card>
+      <StyledBody>
+        <b>Disclaimer</b> <br/>
+        This project has been developed for the <a href='https://www.encode.club/polkadot-club-hackathon'>Polkadot Encode Hackathon 2021</a>.<br/>
+        It is still under development, use it at your own risks.
+      </StyledBody>
+    </Card>
+  </Block>
+
   )
 }
 
