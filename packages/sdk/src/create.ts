@@ -64,10 +64,18 @@ export const create: CreateFn = async ({api, baseURL}) => {
     responseType: 'arraybuffer',
   }).post
 
+  const getPhactoryUrl = (uri: string) => {
+    console.log('get url for ', uri)
+    if (uri.startsWith('/')){
+      return 'http://localhost:8000' + uri
+    }
+    return uri
+  }
+
   // Get public key from remote for encrypting
   console.log('Getting info');
   const factoryInfo = pruntime_rpc.PhactoryInfo.decode(
-    new Uint8Array((await http<ArrayBuffer>('http://localhost:8000/prpc/PhactoryAPI.GetInfo')).data)
+    new Uint8Array((await http<ArrayBuffer>(getPhactoryUrl('/prpc/PhactoryAPI.GetInfo'))).data)
   )
   // const factoryInfo = pruntime_rpc.PhactoryInfo.decode(
   //   new Uint8Array((await http<ArrayBuffer>('/prpc/PhactoryAPI.GetInfo')).data)
@@ -81,7 +89,7 @@ export const create: CreateFn = async ({api, baseURL}) => {
 
   // Create a query instance with protobuf set
   const contractQuery = (data: pruntime_rpc.IContractQueryRequest) =>
-    http<ArrayBuffer>('http://localhost:8000/prpc/PhactoryAPI.ContractQuery', data, {
+    http<ArrayBuffer>(getPhactoryUrl('/prpc/PhactoryAPI.ContractQuery'), data, {
       transformRequest: (data: pruntime_rpc.IContractQueryRequest) =>
         pruntime_rpc.ContractQueryRequest.encode(data).finish(),
     })
