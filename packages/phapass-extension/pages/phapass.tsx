@@ -250,7 +250,8 @@ const Disclaimer = () => {
       <StyledBody>
         <b>Disclaimer</b> <br/>
         This project has been developed for the <a href='https://www.encode.club/polkadot-club-hackathon'>Polkadot Encode Hackathon 2021</a>.<br/>
-        It is still under development, use it at your own risks.
+        As a Hackathon project, it's still under development and is not ready for production nor personal use.<br/>
+        <b>Use it at your own risks :)</b>
       </StyledBody>
     </Card>
   </Block>
