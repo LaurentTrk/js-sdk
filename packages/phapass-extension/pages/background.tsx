@@ -1,5 +1,5 @@
 import {create as createPhala, PhalaInstance, CertificateData, randomHex, signCertificate} from '@phala/sdk'
-import {numberToHex, hexAddPrefix, u8aToHex, u8aConcat, hexToU8a, stringToU8a, u8aToString, hexToString} from '@polkadot/util'
+import {numberToHex, hexAddPrefix, u8aToHex, u8aConcat, hexToU8a, stringToU8a, u8aToString, hexToString, hexStripPrefix} from '@polkadot/util'
 import type {ApiPromise} from '@polkadot/api'
 import {cacheUserAccount, closeNotification, enableOptionsPageDisplayOnButtonClick, getCachedUserAccount, installMessageListener, openOptionsPage, sendLengthyNotification, sendNotification} from 'lib/chrome'
 import {createApi} from 'lib/polkadotApi'
@@ -14,26 +14,11 @@ import {useAtom} from 'jotai'
 import { HexString } from '@polkadot/util/types'
 import { createVaultSecrets, decryptPassword, decryptVaultSecrets, encryptPassword } from 'lib/crypto'
 import { pruntime_rpc } from '@phala/sdk/esm/proto'
-const {
-  mnemonicGenerate,
-  mnemonicToMiniSecret,
-  naclKeypairFromSeed,
-  decodeAddress,
-  naclDecrypt,
-  naclEncrypt,
-  randomAsU8a,
-  convertPublicKeyToCurve25519, convertSecretKeyToCurve25519, naclSeal
-} = require('@polkadot/util-crypto');  
+import vault from '../lib/vault'
+
 
 const baseURL = '/'
-const CONTRACT_ID = 7093
 
-const vaultState = {
-  secret: undefined,
-  certificate: undefined,
-  vaultReady: false
-}
-// let theVaultSecret: Uint8Array|undefined = undefined
 
 const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromise; phala: PhalaInstance, account: InjectedAccountWithMeta, certificate: CertificateData}) => {
   console.log('BackgroundVaultReady')
@@ -53,26 +38,18 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
     setVaultSecrets(account);
   }, [])
   
-  useEffect(() => {
-    if (vaultState.secret){
-      const password = "This.is.a.long.secret.to.be.kept.secret"
-      const encryptedPassword = encryptPassword(password, vaultState.secret)
-      console.log('password', decryptPassword(encryptedPassword, vaultState.secret))
-    }
-  }, [])
-    
   const setVaultSecrets = async (account: InjectedAccountWithMeta) => {
     if (!vaultPublicKey || !vaultSecretKeys){
       const { vaultKeyPair, vaultEncryptedKeys, vaultSecret } = createVaultSecrets(account)
       setVaultPublicKey(u8aToHex(vaultKeyPair.publicKey));
       setVaultPrivateKey(vaultKeyPair.secretKey);
       setVaultSecretKeys(u8aToHex(vaultEncryptedKeys));
-      vaultState.secret = vaultSecret;
+      vault.setSecret(vaultSecret);
     }else{
       const notificationId = await sendLengthyNotification('Please decrypt these few bytes to unlock your vault :)')
       try{
         const { decryptedVaultSecret, decryptedVaultSecretKey } = await decryptVaultSecrets(account, vaultSecretKeys, vaultPublicKey)
-        vaultState.secret = decryptedVaultSecret as any;
+        vault.setSecret(decryptedVaultSecret);
         setVaultPrivateKey(decryptedVaultSecretKey);
         closeNotification(notificationId)
         sendNotification('Your vault is unlocked, enjoy !')
@@ -93,177 +70,63 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
     const sanitizedUrl = sender.tab.url.split('#')[0].split('?')[0];
     const url = request.hasOwnProperty('url') ? request.url : sanitizedUrl
     if (request.command === "get" && certificate){
-        
-        getCredential(certificate, url, (credential: any) => {
-          console.log('credential', credential)
-          if (credential){
-            sendResponse(credential);
-          }else{
-            sendResponse({error: `No credential for ${url}`});
-          }
-        })
-    } else if (request.command === "set"){
-        addCredential(account, url, request.username, request.password);
-      } else if (request.command === "remove"){
-        removeCredential(account, url).then((response) => {
-          console.log('Got remove credential answer')
-          sendResponse(response)
+        const credential = await vault.getCredential(url)
+        console.log('credential', credential)
+        if (credential){
+          sendResponse(credential);
+        }else{
+          sendResponse({error: `No credential for ${url}`});
         }
-        )
-        
+    } else if (request.command === "set"){
+        addCredential(url, request.username, request.password, sendResponse);
+    } else if (request.command === "remove"){
+      removeCredential(url, sendResponse)
     } else if (request.command === "list"){
-        listCredentials(certificate, (credentials: any) => {
-          sendResponse(credentials);
-        })
+      sendResponse(await vault.listCredentials())
     } else if (request.command === "status"){
-        sendResponse({certificate, account, hasVault: true});
+      sendResponse({certificate, account, hasVault: vault.userVaultIsReady()});
     }
     return true
   }
 
-  const getCredential = async (certificateData: CertificateData, url: String, callback: any) => {
-    if (!certificateData) return
-    const encodedQuery = api
-      .createType('PhapassRequest', {
-        head: {
-          id: numberToHex(CONTRACT_ID, 256),
-          nonce: hexAddPrefix(randomHex(32)),
-        },
-        data: {getCredential: url},
-      })
-      .toHex()
 
-      phala
-      .query(encodedQuery, certificateData)
-      .then((data: any) => {
-        const {
-          result: {ok, err},
-        } = api
-          .createType('PhapassResponse', hexAddPrefix(data))
-          .toJSON() as any
 
-        if (ok) {
-          console.log(ok);
-          const { existingCredentials } = ok
-          console.log('existingCredentials.password', existingCredentials.password)
-          if (vaultState.secret){
-            existingCredentials.password = decryptPassword('0x' + existingCredentials.password, vaultState.secret)
-          }
-          callback(existingCredentials)
-        }
-
-        if (err) {
-          throw new Error(err)
-        }
-      })
-      .catch((err: any) => {
-        console.error(err)
-        callback(null)
-      })
-  }
-
-  const listCredentials = async (certificateData: CertificateData, callback: any) => {
-    if (!certificateData) return
-    const encodedQuery = api
-      .createType('PhapassRequest', {
-        head: {
-          id: numberToHex(CONTRACT_ID, 256),
-          nonce: hexAddPrefix(randomHex(32)),
-        },
-        data: {listCredentials: null},
-      })
-      .toHex()
-
-      phala
-      .query(encodedQuery, certificateData)
-      .then((data: any) => {
-        const {
-          result: {ok, err},
-        } = api
-          .createType('PhapassResponse', hexAddPrefix(data))
-          .toJSON() as any
-
-        if (ok) {
-          console.log(ok);
-          const { credentials } = ok
-          console.log('existingCredentials', credentials)
-          callback(credentials)
-        }
-
-        if (err) {
-          throw new Error(err)
-        }
-      })
-      .catch((err: any) => {
-        console.error(err)
-        callback(null)
-      })
-  }
-
-  const addCredential = async (account: InjectedAccountWithMeta, url: string, username: string, password: string) => {
-    
-    const encryptedPassword = vaultState.secret ? encryptPassword(password, vaultState.secret):undefined
-    console.log('encryptedPassword', encryptedPassword as string)
-    const signer = await getSigner(account)
+  const addCredential = async (url: string, username: string, password: string, sendResponse: any) => {
     let notificationId = await sendLengthyNotification('Please sign the transaction to add the credential to your vault')
-    const _unsubscribe = await phala
-      .command({
-        account,
-        contractId: CONTRACT_ID,
-        payload: api
-          .createType('PhapassCommand', {AddCredential: {
-            'url': url, 'username': username, 'password': encryptedPassword?.slice(2)
-          }})
-          .toHex(),
-        signer,
-        onStatus: async (status: any) => {
-          console.log('onStatus', status)
-          if (status.isFinalized) {
-            closeNotification(notificationId)
-            sendNotification('Your credential has been saved !')
-          }else if (!status.isCompleted) {
-            closeNotification(notificationId)
-            notificationId = await sendLengthyNotification('Please wait, the transaction is being processed...')
-          }
-        },
-      })
-      .catch((err:any) => {
-        console.error(err)
-      })
+    const onStatus = async (status: any) => {
+      if (!status.isFinalized && !status.isCompleted) {
+        closeNotification(notificationId)
+        notificationId = await sendLengthyNotification('Please wait, your credential is being added...')
+      }
+    }
+    vault.addCredential(url, username, password, onStatus).then(()=>{
+      closeNotification(notificationId)
+      sendNotification('Your credential has been saved !')
+      sendResponse({})
+    }).catch(() => {
+      closeNotification(notificationId)
+      sendNotification('Something prevents us from removing your credential :(')
+      sendResponse({})
+    })
   }
 
-  const removeCredential = async (account: InjectedAccountWithMeta, url: string) => {
-    
-    const signer = await getSigner(account)
+  const removeCredential = async (url: string, sendResponse: any) => {
     let notificationId = await sendLengthyNotification('Please sign the transaction to remove your credential.')
-    const phalaCommandPromise = new Promise((resolve, reject) => {
-      phala
-      .command({
-        account,
-        contractId: CONTRACT_ID,
-        payload: api
-          .createType('PhapassCommand', {RemoveCredential: url
-          })
-          .toHex(),
-        signer,
-        onStatus: async (status: any) => {
-          console.log('onStatus', status)
-          if (status.isFinalized) {
-            closeNotification(notificationId)
-            sendNotification('Your credential has been removed !')
-            resolve({})
-          }else if (!status.isCompleted) {
-            closeNotification(notificationId)
-            notificationId = await sendLengthyNotification('Please wait, your credential is being removed...')
-          }
-        },
-      })
-      .catch((err:any) => {
-        console.error(err)
-        reject(err)
-      })
+    const onStatus = async (status: any) => {
+      if (!status.isFinalized && !status.isCompleted) {
+        closeNotification(notificationId)
+        notificationId = await sendLengthyNotification('Please wait, your credential is being removed...')
+      }
+    }
+    vault.removeCredential(url, onStatus).then(()=>{
+      closeNotification(notificationId)
+      sendNotification('Your credential has been removed !')
+      sendResponse({})
+    }).catch(() => {
+      closeNotification(notificationId)
+      sendNotification('Something prevents us from removing your credential :(')
+      sendResponse({})
     })
-    return await phalaCommandPromise
   }
 
   return (
@@ -287,7 +150,12 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
 
   useEffect(() => {   
     console.log('BackgroundVault - Installing message listener')
-    installMessageListener(onMessage)    
+    vault.setApi(api)
+    vault.setPhala(phala)
+    if (!(certificate && account && vault.userVaultIsReady())){
+      installMessageListener(onMessage)
+    }
+        
     if (account){
       if (!certificate){
         onSignCertificate(account)
@@ -298,24 +166,38 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
   }, [])
 
   const onMessage =  (request: any, sender: any, sendResponse: any) => {
-    console.log(sender.tab ?
+    console.log("BackgroundVault " + sender.tab ?
       "from a content script:" + sender.tab.url :
       "from the extension");
     console.log('request', request)
-    const sanitizedUrl = sender.tab.url.split('?')[0];
     if (request.command === 'signCertificate'){
       onSignCertificate(request.account, (certificate: CertificateData, vaultAlreadyCreated: Boolean) => {
         sendResponse({certificate, vaultAlreadyCreated})
       })
     } else if (request.command === 'createVault'){
-      createVault(request.account, request.certificate, (vaultCreated: Boolean) => {
-        sendResponse({vaultCreated})
-      })
+      createVault(sendResponse)
     } else if (request.command === "status"){
-      sendResponse({certificate, account, hasVault: vaultState.vaultReady});
+      sendResponse({certificate, account, hasVault: vault.userVaultIsReady()});
     }
   
     return true
+  }
+
+  const createVault = async (sendResponse: any) => {
+    let notificationId = await sendLengthyNotification('Please sign the transaction to create your vault.')
+    const onStatus = async (status: any) => {
+      if (!status.isFinalized && !status.isCompleted) {
+        closeNotification(notificationId)
+        notificationId = await sendLengthyNotification('Please wait, your vault is being created...')
+      }
+    }
+    vault.createVault(onStatus).then((vaultCreated)=>{
+      closeNotification(notificationId)
+      sendResponse(vaultCreated)
+    }).catch(() => {
+      closeNotification(notificationId)
+      sendNotification('Something prevents us from creating your vault :(')
+    })
   }
 
 
@@ -331,8 +213,9 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
             signer,
           })
         console.log('certificat', certificate)
-        const vaultAlreadyCreated = await onQueryVault(certificate)
-        vaultState.vaultReady = vaultAlreadyCreated
+        vault.setCertificate(certificate)
+        vault.setAccount(account)
+        const vaultAlreadyCreated = await vault.userHasVault()
         setCertificate(certificate)       
         setAccount(account)
         closeNotification(notificationId)
@@ -356,63 +239,7 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
     }
   }
 
-  const onQueryVault = async (certificateData: CertificateData) => {
-    if (!certificateData) return
-    const encodedQuery = api
-      .createType('PhapassRequest', {
-        head: {
-          id: numberToHex(CONTRACT_ID, 256),
-          nonce: hexAddPrefix(randomHex(32)),
-        },
-        data: {hasAVault: null},
-      })
-      .toHex()
-
-    const data: any  = await phala.query(encodedQuery, certificateData)
-    const { result: {ok, err} } = api.createType('PhapassResponse', hexAddPrefix(data)).toJSON() as any
-    
-    if (ok) {
-      return ok.hasAVault;
-    }
-    return false;
-  }
-
-  const createVault = async (account: InjectedAccountWithMeta, certificate: CertificateData, callback: any) => {
-    if (!account) return
-    let notificationId = await sendLengthyNotification('Please sign the transaction to create your vault.')
-    const signer = await getSigner(account)
-    await phala
-      .command({
-        account,
-        contractId: CONTRACT_ID,
-        payload: api
-          .createType('PhapassCommand', {CreateVault: null})
-          .toHex(),
-        signer,
-        onStatus: async (status: any) => {
-          if (status.isFinalized) {
-            // sendNotification('Your vault has been created. Enjoy !')
-            console.log('createVault certificate', certificate)
-            setCertificate(certificate)
-            vaultState.vaultReady = true
-            setAccount(account)
-            callback(true)
-            closeNotification(notificationId)
-          }else if (!status.isCompleted) {
-            closeNotification(notificationId)
-            notificationId = await sendLengthyNotification('Please wait, your vault is being created...')
-          }
-        },
-      })
-      .catch((err: any) => {
-        console.error(err)
-        closeNotification(notificationId)
-        sendNotification('Something prevents us from creating your vault :(')
-        callback(false)
-      })
-  }
-  
-  if (certificate && account && vaultState.vaultReady) {
+  if (certificate && account && vault.userVaultIsReady()) {
     return <BackgroundVaultReady api={api} phala={phala} account={account} certificate={certificate}/>
   }
 
