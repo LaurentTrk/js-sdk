@@ -37,25 +37,3 @@ export function enableOptionsPageDisplayOnButtonClick(){
         chrome.tabs.create({ url: chrome.runtime.getURL("phapass.html") });
     })
 }
-
-export async function getCachedData(){
-    const getLocalStoragePromise = new Promise(resolve => {
-      chrome.storage.local.get(['userAccount'], function(data) {
-          resolve(data);
-        });
-      });
-      return await getLocalStoragePromise;
-  }
-
-export async function getCachedUserAccount(){
-    const cachedData = await getCachedData()
-    if (cachedData.hasOwnProperty('userAccount')){
-        return cachedData['userAccount']
-    }
-    return undefined
-}  
-
-export async function cacheUserAccount(userAccount){
-    chrome.storage.local.set({ userAccount: userAccount}, function () {
-    });
-}  

@@ -1,6 +1,6 @@
 import {create as createPhala, PhalaInstance, CertificateData, signCertificate} from '@phala/sdk'
 import type {ApiPromise} from '@polkadot/api'
-import {cacheUserAccount, closeNotification, enableOptionsPageDisplayOnButtonClick, getCachedUserAccount, installMessageListener, openOptionsPage, sendLengthyNotification, sendNotification
+import { closeNotification, enableOptionsPageDisplayOnButtonClick, installMessageListener, openOptionsPage, sendLengthyNotification, sendNotification
 } from 'lib/chrome'
 import {createApi} from 'lib/polkadotApi'
 import { getSigner } from 'lib/polkadotExtension'
