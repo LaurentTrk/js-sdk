@@ -1,48 +1,26 @@
-import type {ApiPromise} from '@polkadot/api'
-import {numberToHex, hexAddPrefix, u8aToHex} from '@polkadot/util'
-import {createApi} from 'lib/polkadotApi'
-import {FormEventHandler, useCallback, useEffect, useRef, useState} from 'react'
-import {
-  create as createPhala,
-  randomHex,
-  signCertificate,
-  CertificateData,
-  PhalaInstance,
-} from '@phala/sdk'
-import {Input} from 'baseui/input'
-import {Button, SIZE as BUTTONSIZE, KIND} from 'baseui/button'
-import {toaster} from 'baseui/toast'
-import {useAtom} from 'jotai'
+import { useCallback, useEffect, useState } from 'react'
+import { CertificateData } from '@phala/sdk'
+import { Button } from 'baseui/button'
+import { useAtom} from 'jotai'
 import accountAtom from 'atoms/account'
-import {getSigner} from 'lib/polkadotExtension'
-import {FormControl} from 'baseui/form-control'
-import {ProgressSteps, NumberedStep} from 'baseui/progress-steps'
-import {LabelXSmall, ParagraphMedium} from 'baseui/typography'
-import {StyledSpinnerNext} from 'baseui/spinner'
+import { ProgressSteps, NumberedStep } from 'baseui/progress-steps'
+import { ParagraphMedium } from 'baseui/typography'
 import {Block} from 'baseui/block'
 import {ButtonGroup, SIZE} from 'baseui/button-group'
-import {decodeAddress} from '@polkadot/util-crypto'
 import { sendMessage } from 'lib/chrome'
 import AccountSelect from '../components/AccountSelect'
-import { Table } from "baseui/table-semantic";
 import {
   TableBuilder,
   TableBuilderColumn,
 } from 'baseui/table-semantic';
 import {StyledLink as Link} from 'baseui/link';
-import { StatefulPopover } from "baseui/popover";
 import {H4} from 'baseui/typography'
 import {
   Card,
-  StyledBody,
-  StyledAction
+  StyledBody
 } from "baseui/card";
-import { Alert } from 'baseui/icon'
 
-const baseURL = '/'
-const CONTRACT_ID = 7093
-
-const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
+const PhaPass = () => {
 
   console.log('Vault')
   const [account] = useAtom(accountAtom)
@@ -53,7 +31,6 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
   const [vaultLoading, setVaultLoading] = useState(false)
   const [tutorialFinished, setTutorialFinished] = useState(false)
   const [credentials, setCredentials] = useState<any>()
-  const unsubscribe = useRef<() => void>()
 
   useEffect(() => {
     sendMessage({command: "status"}, (response: any) => {
@@ -63,14 +40,6 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
       }
     })
   }, [])
-
-  useEffect(() => {
-    const _unsubscribe = unsubscribe.current
-    return () => {
-      api?.disconnect()
-      _unsubscribe?.()
-    }
-  }, [api])
 
   useEffect(() => {
     setCertificateData(undefined)
@@ -87,7 +56,7 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
     if (account) {
       setVaultAccount(account)
     }
-  }, [api, account])
+  }, [account])
   
   
   const onSignCertificate = useCallback(async () => {
@@ -100,7 +69,7 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
       })
       
     }
-  }, [api, account])
+  }, [account])
 
   const onCreateVault = useCallback(async () => {
     if (account) {
@@ -110,11 +79,11 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
         setVaultLoading(false)
       })
     }
-  }, [api, account])
+  }, [account])
 
   const letsGo = useCallback(async () => {
     setTutorialFinished(true)
-  }, [api, account])
+  }, [account])
 
   const copyPasswordToClipboard = (url: string) => {
     sendMessage({command: "get", url}, (credential: any) => {
@@ -256,44 +225,6 @@ const Disclaimer = () => {
     </Card>
   </Block>
 
-  )
-}
-
-const PhaPass: Page = () => {
-  console.log('PhaPass')
-  const [api, setApi] = useState<ApiPromise>()
-  const [phala, setPhala] = useState<PhalaInstance>()
-
-  useEffect(() => {
-    createApi({
-      endpoint: process.env.NEXT_PUBLIC_WS_ENDPOINT as string,
-    })
-      .then((api) => {
-        setApi(api)
-        return createPhala({api, baseURL}).then((phala) => {
-          setPhala(() => phala)
-        })
-      })
-      .catch((err) => {
-        toaster.negative((err as Error).message, {})
-      })
-  }, [])
-
-  if (api && phala) {
-    return <Vault api={api} phala={phala} />
-  }
-
-  return (
-    <Block
-      display="flex"
-      flexDirection="column"
-      alignItems="center"
-      height="280px"
-      justifyContent="center"
-    >
-      <StyledSpinnerNext />
-      <LabelXSmall marginTop="20px">Please wait till we get connected to your personal vault :)</LabelXSmall>
-    </Block>
   )
 }
 
