@@ -242,9 +242,7 @@ const vault:Vault = {
                     account:vaultState.account,
                     contractId: CONTRACT_ID,
                     payload: vaultState.api
-                    .createType('PhapassCommand', {RemoveCredential: {
-                        'url': url
-                    }})
+                    .createType('PhapassCommand', {RemoveCredential: url})
                     .toHex(),
                     signer,
                     onStatus: async (status: any) => {
