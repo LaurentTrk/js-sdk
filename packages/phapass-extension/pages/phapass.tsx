@@ -150,7 +150,7 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
           <StyledBody>
           No credential has been stored yet. 
           </StyledBody>
-          <Button onClick={ () => { window.open("http://localhost:8080/auth/admin/", '_blank')}}>Let's visit our testing login page !</Button>
+          <Button onClick={ () => { window.open("https://the-internet.herokuapp.com/login", '_blank')}}>Let's visit our testing login page !</Button>
           </div>
         }
         {credentials && credentials.length > 0 && 
