@@ -5,7 +5,7 @@ import { closeNotification, enableOptionsPageDisplayOnButtonClick, installMessag
 import {createApi} from 'lib/polkadotApi'
 import { getSigner } from 'lib/polkadotExtension'
 import Head from 'next/head'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types'
 import accountAtom from 'atoms/account'
 import { useAtom } from 'jotai'
@@ -16,17 +16,113 @@ import vault from '../lib/vault'
 
 const baseURL = '/'
 
-
-const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromise; phala: PhalaInstance, account: InjectedAccountWithMeta, certificate: CertificateData}) => {
-  console.log('BackgroundVaultReady')
-
-  useEffect(() => {
-    enableOptionsPageDisplayOnButtonClick()
-    console.log('BackgroundVaultReady - Installing message listener')
-    installMessageListener(onMessage)
-    unlockVaultIfNeeded(account);
-  }, [])
+const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
+  console.log('BackgroundVault')
   
+  // const [certificate, setCertificate] = useState<CertificateData>()
+  const [account, setAccount] = useAtom(accountAtom)
+
+  useEffect(() => {   
+    
+    vault.setApi(api)
+    vault.setPhala(phala)
+    enableOptionsPageDisplayOnButtonClick()
+    installMessageListener(onMessageFromOptionsPage)
+    installMessageListener(onMessageFromContentScript)
+  // if (!(certificate && account && vault.userVaultIsReady())){
+  //   }
+        
+    if (account){
+      vault.setAccount(account)
+      if (vault.state?.account){
+        if (vault.state?.certificate){
+          if (!vault.state?.secret){
+            unlockVaultIfNeeded(vault.state?.account)
+          }
+        } else {
+          onSignCertificate(vault.state?.account)
+        }
+      }
+    }else{
+      openOptionsPage()
+    }
+  }, [])
+
+  const onMessageFromOptionsPage =  (request: any, sender: any, sendResponse: any) => {
+    console.log("onMessageFromOptionsPage " + sender.tab ?
+      "from a content script:" + sender.tab.url :
+      "from the extension");
+    console.log('request', request)
+  if (request.command === 'signCertificate'){
+      onSignCertificate(request.account, (certificate: CertificateData, vaultAlreadyCreated: Boolean) => {
+        sendResponse({certificate, vaultAlreadyCreated})
+      })
+    } else if (request.command === 'createVault'){
+      createVault(sendResponse)
+    } else if (request.command === "status"){
+      sendResponse({certificate: vault.state?.certificate, account: vault.state?.account, hasVault: vault.userVaultIsReady()});
+    }
+    return true
+  }
+
+  const onMessageFromContentScript =  async (request: any, sender: any, sendResponse: any) => {
+    console.log("onMessageFromContentScript " + sender.tab ?
+      "from a content script:" + sender.tab.url :
+      "from the extension");
+    console.log('request', request)
+    const sanitizedUrl = sender.tab.url.split('#')[0].split('?')[0];
+    const url = request.hasOwnProperty('url') ? request.url : sanitizedUrl
+    if (request.command === "get" && vault.state?.certificate){
+        const credential = await vault.getCredential(url)
+        console.log('credential', credential)
+        if (credential){
+          sendResponse(credential);
+        }else{
+          sendResponse({error: `No credential for ${url}`});
+        }
+    } else if (request.command === "set"){
+        addCredential(url, request.username, request.password, sendResponse);
+    } else if (request.command === "remove"){
+      removeCredential(url, sendResponse)
+    } else if (request.command === "list"){
+      sendResponse(await vault.listCredentials())
+    }
+    return true
+  }
+
+  // const onMessage =  async (request: any, sender: any, sendResponse: any) => {
+  //   console.log("BackgroundVault " + sender.tab ?
+  //     "from a content script:" + sender.tab.url :
+  //     "from the extension");
+  //   console.log('request', request)
+  //   const sanitizedUrl = sender.tab.url.split('#')[0].split('?')[0];
+  //   const url = request.hasOwnProperty('url') ? request.url : sanitizedUrl
+  //   if (request.command === 'signCertificate'){
+  //     onSignCertificate(request.account, (certificate: CertificateData, vaultAlreadyCreated: Boolean) => {
+  //       sendResponse({certificate, vaultAlreadyCreated})
+  //     })
+  //   } else if (request.command === 'createVault'){
+  //     createVault(sendResponse)
+  //   } else if (request.command === "status"){
+  //     sendResponse({certificate: vault.state?.certificate, account: vault.state?.account, hasVault: vault.userVaultIsReady()});
+  //   } else if (request.command === "get" && vault.state?.certificate){
+  //       const credential = await vault.getCredential(url)
+  //       console.log('credential', credential)
+  //       if (credential){
+  //         sendResponse(credential);
+  //       }else{
+  //         sendResponse({error: `No credential for ${url}`});
+  //       }
+  //   } else if (request.command === "set"){
+  //       addCredential(url, request.username, request.password, sendResponse);
+  //   } else if (request.command === "remove"){
+  //     removeCredential(url, sendResponse)
+  //   } else if (request.command === "list"){
+  //     sendResponse(await vault.listCredentials())
+  //   }
+  //   return true
+  // }
+
   const unlockVaultIfNeeded = async (account: InjectedAccountWithMeta) => {
     if (!vault.secretIsSet()){
       const notificationId = await sendLengthyNotification('Please decrypt these few bytes to unlock your vault :)')
@@ -48,35 +144,62 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
     }
   }  
 
-  const onMessage =  async (request: any, sender: any, sendResponse: any) => {
-    console.log(sender.tab ?
-      "from a content script:" + sender.tab.url :
-      "from the extension");
-    console.log('request', request)
-    console.log('certificate', certificate)
-    const sanitizedUrl = sender.tab.url.split('#')[0].split('?')[0];
-    const url = request.hasOwnProperty('url') ? request.url : sanitizedUrl
-    if (request.command === "get" && certificate){
-        const credential = await vault.getCredential(url)
-        console.log('credential', credential)
-        if (credential){
-          sendResponse(credential);
-        }else{
-          sendResponse({error: `No credential for ${url}`});
-        }
-    } else if (request.command === "set"){
-        addCredential(url, request.username, request.password, sendResponse);
-    } else if (request.command === "remove"){
-      removeCredential(url, sendResponse)
-    } else if (request.command === "list"){
-      sendResponse(await vault.listCredentials())
-    } else if (request.command === "status"){
-      sendResponse({certificate, account, hasVault: vault.userVaultIsReady()});
+
+  const createVault = async (sendResponse: any) => {
+    let notificationId = await sendLengthyNotification('Please sign the transaction to create your vault.')
+    const onStatus = async (status: any) => {
+      if (!status.isFinalized && !status.isCompleted) {
+        closeNotification(notificationId)
+        notificationId = await sendLengthyNotification('Please wait, your vault is being created...')
+      }
     }
-    return true
+    vault.createVault(onStatus).then((vaultCreated)=>{
+      closeNotification(notificationId)
+      sendResponse(vaultCreated)
+    }).catch(() => {
+      closeNotification(notificationId)
+      sendNotification('Something prevents us from creating your vault :(')
+    })
   }
 
 
+  const onSignCertificate = async (account: InjectedAccountWithMeta, callback?: any ) => {
+    if (account) {
+      const notificationId = await sendLengthyNotification('You need to sign your certificate to access your vault.')
+      try {
+        const signer = await getSigner(account)
+        // setAccount(account)
+        console.log('signer', signer)
+        const certificate = await signCertificate({
+            api,
+            address: account.address,
+            signature_type: pruntime_rpc.SignatureType.Ed25519WrapBytes,
+            signer,
+          })
+        console.log('certificat', certificate)
+        vault.setCertificate(certificate)
+        vault.setAccount(account)
+        const vaultAlreadyCreated = await vault.userHasVault()
+        closeNotification(notificationId)
+        if (callback){
+          callback(certificate, vaultAlreadyCreated)
+        }else{
+            if (vaultAlreadyCreated && vault.state?.account){
+              unlockVaultIfNeeded(vault.state?.account)
+            }else{
+              openOptionsPage() 
+            }
+        }
+      } catch (err) {
+        console.error(err);
+        closeNotification(notificationId)
+        sendNotification('Something wrong happen when signing your certificate :(')
+      }
+    }
+    if (callback){
+      callback(undefined, undefined)
+    }
+  }
 
   const addCredential = async (url: string, username: string, password: string, sendResponse: any) => {
     let notificationId = await sendLengthyNotification('Please sign the transaction to add the credential to your vault')
@@ -124,120 +247,6 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
     </div>
   )
 
-
-}
-
-
-
-const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
-  console.log('BackgroundVault')
-  
-  const [certificate, setCertificate] = useState<CertificateData>()
-  const [account, setAccount] = useAtom(accountAtom)
-
-  useEffect(() => {   
-    console.log('BackgroundVault - Installing message listener')
-    vault.setApi(api)
-    vault.setPhala(phala)
-    if (!(certificate && account && vault.userVaultIsReady())){
-      installMessageListener(onMessage)
-    }
-        
-    if (account){
-      if (!certificate){
-        onSignCertificate(account)
-      }
-    }else{
-      openOptionsPage()
-    }
-  }, [])
-
-  const onMessage =  (request: any, sender: any, sendResponse: any) => {
-    console.log("BackgroundVault " + sender.tab ?
-      "from a content script:" + sender.tab.url :
-      "from the extension");
-    console.log('request', request)
-    if (request.command === 'signCertificate'){
-      onSignCertificate(request.account, (certificate: CertificateData, vaultAlreadyCreated: Boolean) => {
-        sendResponse({certificate, vaultAlreadyCreated})
-      })
-    } else if (request.command === 'createVault'){
-      createVault(sendResponse)
-    } else if (request.command === "status"){
-      sendResponse({certificate, account, hasVault: vault.userVaultIsReady()});
-    }
-  
-    return true
-  }
-
-  const createVault = async (sendResponse: any) => {
-    let notificationId = await sendLengthyNotification('Please sign the transaction to create your vault.')
-    const onStatus = async (status: any) => {
-      if (!status.isFinalized && !status.isCompleted) {
-        closeNotification(notificationId)
-        notificationId = await sendLengthyNotification('Please wait, your vault is being created...')
-      }
-    }
-    vault.createVault(onStatus).then((vaultCreated)=>{
-      closeNotification(notificationId)
-      sendResponse(vaultCreated)
-    }).catch(() => {
-      closeNotification(notificationId)
-      sendNotification('Something prevents us from creating your vault :(')
-    })
-  }
-
-
-  const onSignCertificate = async (account: InjectedAccountWithMeta, callback?: any ) => {
-    if (account) {
-      const notificationId = await sendLengthyNotification('You need to sign your certificate to access your vault.')
-      try {
-        const signer = await getSigner(account)
-        const certificate = await signCertificate({
-            api,
-            address: account.address,
-            signature_type: pruntime_rpc.SignatureType.Ed25519WrapBytes,
-            signer,
-          })
-        console.log('certificat', certificate)
-        vault.setCertificate(certificate)
-        vault.setAccount(account)
-        const vaultAlreadyCreated = await vault.userHasVault()
-        setCertificate(certificate)       
-        setAccount(account)
-        closeNotification(notificationId)
-        if (callback){
-          callback(certificate, vaultAlreadyCreated)
-        }else{
-            if (vaultAlreadyCreated){
-              sendNotification('Your vault is unlocked.\n Enjoy !')
-            }else{
-              openOptionsPage() 
-            }
-        }
-      } catch (err) {
-        console.error(err);
-        closeNotification(notificationId)
-        sendNotification('Something wrong happen when signing your certificate :(')
-      }
-    }
-    if (callback){
-      callback(undefined, undefined)
-    }
-  }
-
-  if (certificate && account && vault.userVaultIsReady()) {
-    return <BackgroundVaultReady api={api} phala={phala} account={account} certificate={certificate}/>
-  }
-
-  return (
-    <div>
-      <Head>
-        <title>Phala Password Manager Background Page</title>
-      </Head>
-    </div>
-  )
-
 }
 
 
@@ -246,7 +255,8 @@ const Background: Page = () => {
 
   const [api, setApi] = useState<ApiPromise>()
   const [phala, setPhala] = useState<PhalaInstance>()
-
+  const unsubscribe = useRef<() => void>()
+  
   useEffect(() => {
     createApi({
       endpoint: process.env.NEXT_PUBLIC_WS_ENDPOINT as string,
@@ -262,6 +272,14 @@ const Background: Page = () => {
         sendNotification('Something prevents us to connect to PhaPas Blockchain :(')
       })
   }, [])
+
+  useEffect(() => {
+    const _unsubscribe = unsubscribe.current
+    return () => {
+      api?.disconnect()
+      _unsubscribe?.()
+    }
+  }, [api])
 
   if (api && phala) {
     return <BackgroundVault api={api} phala={phala} />

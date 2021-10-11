@@ -4,7 +4,8 @@ import { Button } from 'baseui/button'
 import { useAtom} from 'jotai'
 import accountAtom from 'atoms/account'
 import { ProgressSteps, NumberedStep } from 'baseui/progress-steps'
-import { ParagraphMedium } from 'baseui/typography'
+import {LabelXSmall, ParagraphMedium} from 'baseui/typography'
+import {StyledSpinnerNext} from 'baseui/spinner'
 import {Block} from 'baseui/block'
 import {ButtonGroup, SIZE} from 'baseui/button-group'
 import { sendMessage } from 'lib/chrome'
@@ -31,6 +32,7 @@ const PhaPass = () => {
   const [vaultLoading, setVaultLoading] = useState(false)
   const [tutorialFinished, setTutorialFinished] = useState(false)
   const [credentials, setCredentials] = useState<any>()
+  const [statusUpdated, setStatusUpdated] = useState(false)
 
   useEffect(() => {
     sendMessage({command: "status"}, (response: any) => {
@@ -38,6 +40,7 @@ const PhaPass = () => {
       if (response.hasVault === true){
         setTutorialFinished(true)
       }
+      setStatusUpdated(true)
     })
   }, [])
 
@@ -151,59 +154,74 @@ const PhaPass = () => {
     </Block>
     )
   }
-  return (
-    <div>
-      <StyledBody>
-        <b>Welcome to PhaPass</b>, the password manager which stores your secret credentials in the <a href='https://phala.network/'>Phala Blockchain</a>.<br/>
-        It seems that your private vault has not been created yet, the following tutorial will help you to get started !.<br/>
-      </StyledBody>
+
+  if (statusUpdated){
+    return (
+      <div>
+        <StyledBody>
+          <b>Welcome to PhaPass</b>, the password manager which stores your secret credentials in the <a href='https://phala.network/'>Phala Blockchain</a>.<br/>
+          It seems that your private vault has not been created yet, the following tutorial will help you to get started !.<br/>
+        </StyledBody>
 
 
-    <ProgressSteps
-      current={vaultAccount ? certificateData ? hasVault ? 3 : 2 : 1 : 0}
-      overrides={{
-        Root: {
-          style: {width: '100%'},
-        },
-      }}
-    >
-      <NumberedStep title="Choose Account">
-        <ParagraphMedium>You need to choose the user account that will be linked to your vault.</ParagraphMedium>
-          <AccountSelect/>
+      <ProgressSteps
+        current={vaultAccount ? certificateData ? hasVault ? 3 : 2 : 1 : 0}
+        overrides={{
+          Root: {
+            style: {width: '100%'},
+          },
+        }}
+      >
+        <NumberedStep title="Choose Account">
+          <ParagraphMedium>You need to choose the user account that will be linked to your vault.</ParagraphMedium>
+            <AccountSelect/>
+            <Button
+              onClick={onSelectVaultAccount}
+              disabled={vaultAccount}
+              >
+              Select this account
+            </Button>
+        </NumberedStep>
+        <NumberedStep title="Sign Certificate">
+          <ParagraphMedium>In order to access your vault, you are required to sign a certificate.</ParagraphMedium>
           <Button
-            onClick={onSelectVaultAccount}
-            disabled={vaultAccount}
-            >
-            Select this account
+            isLoading={signCertificateLoading}
+            onClick={onSignCertificate}
+            disabled={!account}
+          >
+            Sign your certificate
           </Button>
-      </NumberedStep>
-      <NumberedStep title="Sign Certificate">
-        <ParagraphMedium>In order to access your vault, you are required to sign a certificate.</ParagraphMedium>
-        <Button
-          isLoading={signCertificateLoading}
-          onClick={onSignCertificate}
-          disabled={!account}
-        >
-          Sign your certificate
-        </Button>
-      </NumberedStep>
-      <NumberedStep title="Create Vault">
-        <ParagraphMedium>Your personal and private vault will hold your credentials.</ParagraphMedium>
-        <Button
-          isLoading={vaultLoading}
-          onClick={onCreateVault}
-          disabled={!account}
-        >
-          Create your vault
-        </Button>
-      </NumberedStep>
-      <NumberedStep title="Enjoy :)">
-        <ParagraphMedium>Your personal and private vault has been created and is ready to hold your secret credentials :)</ParagraphMedium>
-        <Button onClick={letsGo}>Let's go</Button>
-      </NumberedStep>
-    </ProgressSteps>
-    <Disclaimer/>
-    </div>
+        </NumberedStep>
+        <NumberedStep title="Create Vault">
+          <ParagraphMedium>Your personal and private vault will hold your credentials.</ParagraphMedium>
+          <Button
+            isLoading={vaultLoading}
+            onClick={onCreateVault}
+            disabled={!account}
+          >
+            Create your vault
+          </Button>
+        </NumberedStep>
+        <NumberedStep title="Enjoy :)">
+          <ParagraphMedium>Your personal and private vault has been created and is ready to hold your secret credentials :)</ParagraphMedium>
+          <Button onClick={letsGo}>Let's go</Button>
+        </NumberedStep>
+      </ProgressSteps>
+      <Disclaimer/>
+      </div>
+    )
+  }
+  return (
+    <Block
+      display="flex"
+      flexDirection="column"
+      alignItems="center"
+      height="280px"
+      justifyContent="center"
+    >
+      <StyledSpinnerNext />
+      <LabelXSmall marginTop="20px">Please wait till we get connected to your personal vault :)</LabelXSmall>
+    </Block>
   )
 }
 

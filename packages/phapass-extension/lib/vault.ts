@@ -4,8 +4,19 @@ import { hexAddPrefix, hexStripPrefix, hexToU8a, numberToHex } from "@polkadot/u
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types'
 import { createVaultSecrets, decryptPassword, encryptPassword } from "./crypto"
 import { getSigner } from "./polkadotExtension"
+import { State } from "baseui/input"
+
+interface VaultState {
+    api?: ApiPromise,
+    phala?: PhalaInstance,
+    account?: InjectedAccountWithMeta,
+    secret?: Uint8Array,
+    certificate?: CertificateData,
+    vaultReady?: boolean    
+}
 
 interface Vault {
+    state?: VaultState,
     setApi(api: ApiPromise): void,
     setPhala(phala: PhalaInstance): void,
     setAccount(account: InjectedAccountWithMeta): void,
@@ -22,14 +33,6 @@ interface Vault {
     removeCredential(url: string, onStatus: any): Promise<any>
 }
 
-interface VaultState {
-    api?: ApiPromise,
-    phala?: PhalaInstance,
-    account?: InjectedAccountWithMeta,
-    secret?: Uint8Array,
-    certificate?: CertificateData,
-    vaultReady?: boolean    
-}
 
 const vaultState: VaultState = {
     api : undefined,
@@ -42,6 +45,7 @@ const vaultState: VaultState = {
 const CONTRACT_ID = 7093
 
 const vault:Vault = {
+    state: vaultState,
     setApi: (api: ApiPromise): void => {
         vaultState.api = api
     },
