@@ -1,7 +1,8 @@
 import {create as createPhala, PhalaInstance, CertificateData, randomHex, signCertificate} from '@phala/sdk'
 import {numberToHex, hexAddPrefix, u8aToHex, u8aConcat, hexToU8a, stringToU8a, u8aToString, hexToString, hexStripPrefix} from '@polkadot/util'
 import type {ApiPromise} from '@polkadot/api'
-import {cacheUserAccount, closeNotification, enableOptionsPageDisplayOnButtonClick, getCachedUserAccount, installMessageListener, openOptionsPage, sendLengthyNotification, sendNotification} from 'lib/chrome'
+import {cacheUserAccount, closeNotification, enableOptionsPageDisplayOnButtonClick, getCachedUserAccount, installMessageListener, openOptionsPage, sendLengthyNotification, sendNotification, sendNotification
+} from 'lib/chrome'
 import {createApi} from 'lib/polkadotApi'
 import { enablePolkadotExtension, getSigner } from 'lib/polkadotExtension'
 import Head from 'next/head'
@@ -27,10 +28,6 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
   const [vaultPublicKey, setVaultPublicKey] = useAtom(vaultPublicKeyAtom)
   const [vaultSecretKeys, setVaultSecretKeys] = useAtom(vaultSecretKeysAtom)
 
-  // Private values (after decryption) are stored in memory
-  // const [vaultSecret, setVaultSecret] = useState<Uint8Array>()
-  const [vaultPrivateKey, setVaultPrivateKey] = useState<Uint8Array>()
-
   useEffect(() => {
     enableOptionsPageDisplayOnButtonClick()
     console.log('BackgroundVaultReady - Installing message listener')
@@ -42,7 +39,6 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
     if (!vaultPublicKey || !vaultSecretKeys){
       const { vaultKeyPair, vaultEncryptedKeys, vaultSecret } = createVaultSecrets(account)
       setVaultPublicKey(u8aToHex(vaultKeyPair.publicKey));
-      setVaultPrivateKey(vaultKeyPair.secretKey);
       setVaultSecretKeys(u8aToHex(vaultEncryptedKeys));
       vault.setSecret(vaultSecret);
     }else{
@@ -50,7 +46,6 @@ const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromi
       try{
         const { decryptedVaultSecret, decryptedVaultSecretKey } = await decryptVaultSecrets(account, vaultSecretKeys, vaultPublicKey)
         vault.setSecret(decryptedVaultSecret);
-        setVaultPrivateKey(decryptedVaultSecretKey);
         closeNotification(notificationId)
         sendNotification('Your vault is unlocked, enjoy !')
       } catch (err) {
@@ -225,7 +220,7 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
             if (vaultAlreadyCreated){
               sendNotification('Your vault is unlocked.\n Enjoy !')
             }else{
-              openOptionsPage()
+              openOptionsPage() 
             }
         }
       } catch (err) {
