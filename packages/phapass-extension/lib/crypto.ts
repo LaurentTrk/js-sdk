@@ -34,17 +34,17 @@ export const createVaultSecrets = (account : InjectedAccountWithMeta) => {
     console.log(`userPublicKey: ${u8aToHex(publicKey)}`);
   
     const vaultEncryptedKeys = encrypt(vaultSecretKeys, vaultKeyPair.secretKey, publicKey);
-  
+    const vaultKeys = u8aToHex(u8aConcat(vaultKeyPair.publicKey, vaultEncryptedKeys));
     console.log(`vaultSecret: ${u8aToHex(vaultSecret)}`);
     console.log(`vaultPublicKey: ${u8aToHex(vaultKeyPair.publicKey)}`);
     console.log(`vaultSecretKey: ${u8aToHex(vaultKeyPair.secretKey)}`);
 
-    return { vaultKeyPair, vaultEncryptedKeys, vaultSecret}
+    return { vaultKeys, vaultSecret}
 }
 
-export const decryptVaultSecrets = async (account : InjectedAccountWithMeta, vaultSecretKeys: HexString, vaultPublicKey: HexString) => {
+export const decryptVaultSecrets = async (account : InjectedAccountWithMeta, vaultSecretKeys: Uint8Array, vaultPublicKey: Uint8Array) => {
     console.log('Decrypt existing vault secrets')
-    const vaultDecryptedKeys = await (await getSigner(account)).decryptBytes(hexToU8a(vaultSecretKeys),hexToU8a(vaultPublicKey))
+    const vaultDecryptedKeys = await (await getSigner(account)).decryptBytes(vaultSecretKeys,vaultPublicKey)
     const decryptedVaultSecret = vaultDecryptedKeys.slice(0, 32); 
     const decryptedVaultSecretKey = vaultDecryptedKeys.slice(32, vaultDecryptedKeys.length); 
     console.log(`decryptedVaultSecret: ${u8aToHex(decryptedVaultSecret)}`);

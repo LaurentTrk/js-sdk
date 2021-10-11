@@ -1,8 +1,8 @@
 import { PhalaInstance, CertificateData, randomHex } from "@phala/sdk"
 import { ApiPromise } from "@polkadot/api"
-import { hexAddPrefix, hexStripPrefix, numberToHex } from "@polkadot/util"
+import { hexAddPrefix, hexStripPrefix, hexToU8a, numberToHex } from "@polkadot/util"
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types'
-import { decryptPassword, encryptPassword } from "./crypto"
+import { createVaultSecrets, decryptPassword, encryptPassword } from "./crypto"
 import { getSigner } from "./polkadotExtension"
 
 interface Vault {
@@ -11,9 +11,11 @@ interface Vault {
     setAccount(account: InjectedAccountWithMeta): void,
     setCertificate(certificate: CertificateData): void,
     setSecret(secret: Uint8Array): void,
+    secretIsSet(): boolean,
     userHasVault():  Promise<boolean>,
     userVaultIsReady():  boolean,
     createVault(onStatus: any): Promise<any>,
+    getKeys(): Promise<Uint8Array | null | undefined>,
     getCredential(url: string): Promise<any>,
     listCredentials(): Promise<any>,
     addCredential(url: string, username: string, password: string, onStatus: any): Promise<any>,
@@ -55,6 +57,9 @@ const vault:Vault = {
     setSecret: (secret: Uint8Array): void => {
         vaultState.secret = secret
     },
+    secretIsSet:(): boolean => {
+        return vaultState.secret !== undefined
+    },
     userVaultIsReady:(): boolean => {
         return vaultState.vaultReady || false
     },
@@ -73,7 +78,7 @@ const vault:Vault = {
         const { result: {ok, err} } = vaultState.api.createType('PhapassResponse', hexAddPrefix(data)).toJSON() as any
     
         if (ok) {
-            vaultState.vaultReady = true
+            vaultState.vaultReady = ok.hasAVault
             return ok.hasAVault;
         }
         vaultState.vaultReady = false
@@ -82,6 +87,8 @@ const vault:Vault = {
     },
     createVault: async (onStatus: any) => {
         if (!vaultState.account || !vaultState.api || !vaultState.phala) return
+        const { vaultKeys, vaultSecret } = createVaultSecrets(vaultState.account)
+        vaultState.secret = vaultSecret;
         const signer = await getSigner(vaultState.account)
         const phalaCommandPromise = new Promise((resolve, reject) => {
             if (!vaultState.account || !vaultState.api || !vaultState.phala) {
@@ -91,7 +98,7 @@ const vault:Vault = {
                     account: vaultState.account,
                     contractId: CONTRACT_ID,
                     payload: vaultState.api
-                    .createType('PhapassCommand', {CreateVault: null})
+                    .createType('PhapassCommand', {CreateVault: hexStripPrefix(vaultKeys)})
                     .toHex(),
                     signer,
                     onStatus: async (status: any) => {
@@ -112,7 +119,28 @@ const vault:Vault = {
     },
 
 
-
+    getKeys: async () => {
+        if (!vaultState.certificate || !vaultState.api || !vaultState.phala) return
+        const encodedQuery = vaultState.api
+          .createType('PhapassRequest', {
+            head: {
+              id: numberToHex(CONTRACT_ID, 256),
+              nonce: hexAddPrefix(randomHex(32)),
+            },
+            data: {getKeys: null},
+          })
+          .toHex()
+    
+        const data: any  = await vaultState.phala.query(encodedQuery, vaultState.certificate)
+        const { result: {ok, err} } = vaultState.api.createType('PhapassResponse', hexAddPrefix(data)).toJSON() as any
+    
+        if (ok) {
+            console.log(ok);
+            const { keys } = ok
+            return hexToU8a(hexAddPrefix(keys))
+        }
+        return null
+    },
     getCredential: async (url: string) => {
         if (!vaultState.certificate || !vaultState.api || !vaultState.phala) return
         const encodedQuery = vaultState.api

@@ -1,19 +1,15 @@
-import {create as createPhala, PhalaInstance, CertificateData, randomHex, signCertificate} from '@phala/sdk'
-import {numberToHex, hexAddPrefix, u8aToHex, u8aConcat, hexToU8a, stringToU8a, u8aToString, hexToString, hexStripPrefix} from '@polkadot/util'
+import {create as createPhala, PhalaInstance, CertificateData, signCertificate} from '@phala/sdk'
 import type {ApiPromise} from '@polkadot/api'
-import {cacheUserAccount, closeNotification, enableOptionsPageDisplayOnButtonClick, getCachedUserAccount, installMessageListener, openOptionsPage, sendLengthyNotification, sendNotification, sendNotification
+import {cacheUserAccount, closeNotification, enableOptionsPageDisplayOnButtonClick, getCachedUserAccount, installMessageListener, openOptionsPage, sendLengthyNotification, sendNotification
 } from 'lib/chrome'
 import {createApi} from 'lib/polkadotApi'
-import { enablePolkadotExtension, getSigner } from 'lib/polkadotExtension'
+import { getSigner } from 'lib/polkadotExtension'
 import Head from 'next/head'
-import {useCallback, useEffect, useState} from 'react'
+import { useEffect, useState } from 'react'
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types'
 import accountAtom from 'atoms/account'
-import vaultPublicKeyAtom from 'atoms/vaultPublicKey'
-import vaultSecretKeysAtom from 'atoms/vaultSecretKeys'
-import {useAtom} from 'jotai'
-import { HexString } from '@polkadot/util/types'
-import { createVaultSecrets, decryptPassword, decryptVaultSecrets, encryptPassword } from 'lib/crypto'
+import { useAtom } from 'jotai'
+import { decryptVaultSecrets } from 'lib/crypto'
 import { pruntime_rpc } from '@phala/sdk/esm/proto'
 import vault from '../lib/vault'
 
@@ -24,34 +20,30 @@ const baseURL = '/'
 const BackgroundVaultReady = ({api, phala, account, certificate}: {api: ApiPromise; phala: PhalaInstance, account: InjectedAccountWithMeta, certificate: CertificateData}) => {
   console.log('BackgroundVaultReady')
 
-  // Public and encrypted keys are stored in local storage
-  const [vaultPublicKey, setVaultPublicKey] = useAtom(vaultPublicKeyAtom)
-  const [vaultSecretKeys, setVaultSecretKeys] = useAtom(vaultSecretKeysAtom)
-
   useEffect(() => {
     enableOptionsPageDisplayOnButtonClick()
     console.log('BackgroundVaultReady - Installing message listener')
     installMessageListener(onMessage)
-    setVaultSecrets(account);
+    unlockVaultIfNeeded(account);
   }, [])
   
-  const setVaultSecrets = async (account: InjectedAccountWithMeta) => {
-    if (!vaultPublicKey || !vaultSecretKeys){
-      const { vaultKeyPair, vaultEncryptedKeys, vaultSecret } = createVaultSecrets(account)
-      setVaultPublicKey(u8aToHex(vaultKeyPair.publicKey));
-      setVaultSecretKeys(u8aToHex(vaultEncryptedKeys));
-      vault.setSecret(vaultSecret);
-    }else{
+  const unlockVaultIfNeeded = async (account: InjectedAccountWithMeta) => {
+    if (!vault.secretIsSet()){
       const notificationId = await sendLengthyNotification('Please decrypt these few bytes to unlock your vault :)')
       try{
-        const { decryptedVaultSecret, decryptedVaultSecretKey } = await decryptVaultSecrets(account, vaultSecretKeys, vaultPublicKey)
-        vault.setSecret(decryptedVaultSecret);
-        closeNotification(notificationId)
-        sendNotification('Your vault is unlocked, enjoy !')
+        const vaultKeys = await vault.getKeys()
+        if (vaultKeys){
+          const vaultPublicKey = vaultKeys.slice(0, 32); 
+          const vaultSecretKeys = vaultKeys.slice(32, vaultKeys.length); 
+          const { decryptedVaultSecret, decryptedVaultSecretKey } = await decryptVaultSecrets(account, vaultSecretKeys, vaultPublicKey)
+          vault.setSecret(decryptedVaultSecret);
+          closeNotification(notificationId)
+          sendNotification('Your vault is unlocked, enjoy !')
+        }
       } catch (err) {
         console.error(err);
         closeNotification(notificationId)
-        sendNotification('Something wrong happen when signing your certificate :(')
+        sendNotification('Something wrong happen when unlocking your vault :(')
       }
     }
   }  

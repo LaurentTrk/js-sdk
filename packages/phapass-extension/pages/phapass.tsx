@@ -106,9 +106,9 @@ const Vault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
     if (account) {
       setVaultLoading(true)
       sendMessage({command: "createVault", account, certificate: certificateData}, (response: any) => {
-        setHasVault(response.vaultCreated)
+        setHasVault(response)
+        setVaultLoading(false)
       })
-      setVaultLoading(false)
     }
   }, [api, account])
 
