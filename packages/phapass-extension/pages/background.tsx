@@ -19,7 +19,6 @@ const baseURL = '/'
 const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) => {
   console.log('BackgroundVault')
   
-  // const [certificate, setCertificate] = useState<CertificateData>()
   const [account, setAccount] = useAtom(accountAtom)
 
   useEffect(() => {   
@@ -29,8 +28,6 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
     enableOptionsPageDisplayOnButtonClick()
     installMessageListener(onMessageFromOptionsPage)
     installMessageListener(onMessageFromContentScript)
-  // if (!(certificate && account && vault.userVaultIsReady())){
-  //   }
         
     if (account){
       vault.setAccount(account)
@@ -89,39 +86,6 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
     }
     return true
   }
-
-  // const onMessage =  async (request: any, sender: any, sendResponse: any) => {
-  //   console.log("BackgroundVault " + sender.tab ?
-  //     "from a content script:" + sender.tab.url :
-  //     "from the extension");
-  //   console.log('request', request)
-  //   const sanitizedUrl = sender.tab.url.split('#')[0].split('?')[0];
-  //   const url = request.hasOwnProperty('url') ? request.url : sanitizedUrl
-  //   if (request.command === 'signCertificate'){
-  //     onSignCertificate(request.account, (certificate: CertificateData, vaultAlreadyCreated: Boolean) => {
-  //       sendResponse({certificate, vaultAlreadyCreated})
-  //     })
-  //   } else if (request.command === 'createVault'){
-  //     createVault(sendResponse)
-  //   } else if (request.command === "status"){
-  //     sendResponse({certificate: vault.state?.certificate, account: vault.state?.account, hasVault: vault.userVaultIsReady()});
-  //   } else if (request.command === "get" && vault.state?.certificate){
-  //       const credential = await vault.getCredential(url)
-  //       console.log('credential', credential)
-  //       if (credential){
-  //         sendResponse(credential);
-  //       }else{
-  //         sendResponse({error: `No credential for ${url}`});
-  //       }
-  //   } else if (request.command === "set"){
-  //       addCredential(url, request.username, request.password, sendResponse);
-  //   } else if (request.command === "remove"){
-  //     removeCredential(url, sendResponse)
-  //   } else if (request.command === "list"){
-  //     sendResponse(await vault.listCredentials())
-  //   }
-  //   return true
-  // }
 
   const unlockVaultIfNeeded = async (account: InjectedAccountWithMeta) => {
     if (!vault.secretIsSet()){
