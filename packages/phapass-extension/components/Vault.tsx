@@ -11,6 +11,13 @@ import {
 } from 'baseui/table-semantic';
 import {ButtonGroup, SIZE} from 'baseui/button-group'
 import {StyledLink as Link} from 'baseui/link';
+import {StatefulPopover} from 'baseui/popover';
+import {
+  SnackbarProvider,
+  useSnackbar,
+  DURATION,
+} from 'baseui/snackbar';
+import {toaster} from 'baseui/toast'
 
 const Vault: FC = () => {
 
@@ -29,7 +36,9 @@ const Vault: FC = () => {
   }
 
   const revealPassword = (url: string) => {
-    // navigator.clipboard.writeText(row.username);
+    sendMessage({command: "get", url}, (credential: any) => {
+      toaster.positive("Your password is : " + credential.password, {});
+    })
   }
 
   const forgetPassword = (url: string) => {
@@ -69,13 +78,6 @@ const Vault: FC = () => {
           </TableBuilderColumn>
           <TableBuilderColumn header="Password" numeric>
             {row => <ButtonGroup size={SIZE.mini}>
-                      {/* <StatefulPopover content={() => (<Block padding={"20px"}>{row.username}</Block>)}
-                                      returnFocus
-                                      autoFocus
-                      >
-                        <Button kind={KIND.secondary}
-                                size={BUTTONSIZE.mini}>Reveal</Button>
-                      </StatefulPopover> */}
                       <Button onClick={() => { revealPassword(row.url) }}>Reveal</Button>
                       <Button onClick={() => { copyPasswordToClipboard(row.url) }}>Copy</Button>
                       <Button onClick={() => { forgetPassword(row.url) }}>Forget</Button>

@@ -55,7 +55,7 @@ const Layout: FC<{title?: string}> = ({title, children}) => {
         <ToasterContainer
           placement="top"
           autoHideDuration={3000}
-          overrides={{ToastBody: {style: {wordBreak: 'break-all'}}}}
+          overrides={{ToastBody: {style: {wordBreak: 'break-all', width: '400px'}}}}
         />
       </Block>
     </Block>
