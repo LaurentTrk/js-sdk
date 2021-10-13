@@ -44,26 +44,6 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
       openOptionsPage()
     }
 
-    api.query.system.events((events) => {
-      console.log(`\nReceived ${events.length} events:`);
-
-      // Loop through the Vec<EventRecord>
-      events.forEach((record) => {
-        // Extract the phase, event and the event types
-        const { event, phase } = record;
-        const types = event.typeDef;
-
-        // Show what we are busy with
-        console.log(
-          `\t${event.section}:${event.method}:: (phase=${phase.toString()})`
-        );
-      });
-    });
-
-
-
-
-
   }, [])
 
   const onMessageFromOptionsPage =  (request: any, sender: any, sendResponse: any) => {
