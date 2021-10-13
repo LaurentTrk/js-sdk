@@ -5,9 +5,18 @@ export const types = {
       password: 'String',
     },
     UrlCredential: {
+      command_id: 'String',
       url: 'String',
       username: 'String',
       password: 'String',
+    },
+    KeysCommandArguments: {
+      command_id: 'String',
+      keys: 'String',
+    },
+    RemoveCredentialCommandArguments: {
+      command_id: 'String',
+      url: 'String',
     },
     ListedCredential: {
       url: 'String',
@@ -36,7 +45,7 @@ export const types = {
       result: 'Result<PhapassResponseData, PhapassError>',
     },
     PhapassCommand: {
-      _enum: {CreateVault: 'String', AddCredential: 'UrlCredential', RemoveCredential: 'String'},
+      _enum: {CreateVault: 'KeysCommandArguments', AddCredential: 'UrlCredential', RemoveCredential: 'RemoveCredentialCommandArguments'},
     },
     PhapassCommandType: {
       _enum: ['CreateVault', 'AddCredential', 'RemoveCredential']
@@ -45,6 +54,7 @@ export const types = {
       _enum: ['Success', 'VaultAlreadyExists', 'NoVault', 'NoCredential', 'UnknownError'],
     },
     PhaPassCommandEvent: {
+      command_id: 'String',
       command: 'PhapassCommandType',
       result: 'PhapassCommandResult'
     }

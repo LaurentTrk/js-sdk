@@ -98,7 +98,7 @@ const vault:Vault = {
             if (!vaultState.account || !vaultState.api || !vaultState.phala) {
                 reject()
             }else{
-                resolve_when_command_has_been_executed(() => {
+                const commandId = resolve_when_command_has_been_executed(() => {
                     vaultState.vaultReady = true
                     resolve(vaultState.vaultReady)
                 })
@@ -106,7 +106,10 @@ const vault:Vault = {
                     account: vaultState.account,
                     contractId: CONTRACT_ID,
                     payload: vaultState.api
-                    .createType('PhapassCommand', {CreateVault: hexStripPrefix(vaultKeys)})
+                    .createType('PhapassCommand', {CreateVault: {
+                        'command_id': commandId,
+                        'keys': hexStripPrefix(vaultKeys)
+                    }})
                     .toHex(),
                     signer,
                     onStatus: async (status: any) => {
@@ -207,12 +210,13 @@ const vault:Vault = {
             }else{
                 const encryptedPassword = vaultState.secret ? encryptPassword(password, vaultState.secret):undefined
                 console.log('encryptedPassword', encryptedPassword)
-                resolve_when_command_has_been_executed(resolve)
+                const commandId = resolve_when_command_has_been_executed(resolve)
                 vaultState.phala.command({
                     account:vaultState.account,
                     contractId: CONTRACT_ID,
                     payload: vaultState.api
                     .createType('PhapassCommand', {AddCredential: {
+                        'command_id': commandId,
                         'url': url, 'username': username, 'password': hexStripPrefix(encryptedPassword)
                     }})
                     .toHex(),
@@ -236,12 +240,16 @@ const vault:Vault = {
             if (!vaultState.account || !vaultState.api || !vaultState.phala) {
                 reject()
             }else{
-                resolve_when_command_has_been_executed(resolve)
+                const commandId = resolve_when_command_has_been_executed(resolve)
                 vaultState.phala.command({
                     account:vaultState.account,
                     contractId: CONTRACT_ID,
                     payload: vaultState.api
-                    .createType('PhapassCommand', {RemoveCredential: url})
+                    .createType('PhapassCommand', {RemoveCredential: {
+                        'command_id': commandId,
+                        'url': url
+                    }
+                    })
                     .toHex(),
                     signer,
                     onStatus: async (status: any) => {
@@ -259,6 +267,7 @@ const vault:Vault = {
 }
 
 const resolve_when_command_has_been_executed = (resolve: any) => {
+    const commandId = hexStripPrefix(randomHex())
     if (vaultState.api){
         let unsubscribe_events: any = undefined;
         vaultState.api.query.system.events((events) => {
@@ -268,16 +277,28 @@ const resolve_when_command_has_been_executed = (resolve: any) => {
                 const { event, phase } = record;
                 console.debug(`\t${event.section}:${event.method}:: (phase=${phase.toString()})`);
                 if (event.section == 'phaPass' && event.method == 'CommandExecuted'){
-                    console.log('Command has been executed')
-                    if (unsubscribe_events){
-                    unsubscribe_events();
+                    console.log(event)
+                    event.data.forEach((data:any) => {
+                        console.log('Command : ', data)
+                        if (data.has('command_id')){
+                            console.log('Command has been executed', data.get('command_id') )
+                            if (data.get('command_id') == commandId){
+                                console.log('Command has been executed')
+                                if (unsubscribe_events){
+                                unsubscribe_events();
+                                }
+                                resolve({})
+                                return
+                            }                           
+                        }
+                      });
                     }
-                    resolve({})
-                }
             });
         }).then((_unsub) => {
             unsubscribe_events = _unsub
         })
     }
+    return commandId
 }
+
 export default vault
