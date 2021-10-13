@@ -53,7 +53,7 @@ const Tutorial: FC<{letsGo: any}> = ({letsGo}) => {
     <div>
       <StyledBody>
         <b>Welcome to PhaPass</b>, the password manager which stores your secret credentials in the <a href='https://phala.network/'>Phala Blockchain</a>.<br/>
-        It seems that your private vault has not been created yet, the following tutorial will help you to get started !.<br/>
+        It seems that your private vault has not been created yet, the following tutorial will help you to get started !<br/>
       </StyledBody>
 
 
@@ -66,7 +66,7 @@ const Tutorial: FC<{letsGo: any}> = ({letsGo}) => {
       }}
     >
       <NumberedStep title="Choose Account">
-        <ParagraphMedium>You need to choose the user account that will be linked to your vault.</ParagraphMedium>
+        <ParagraphMedium>You need to choose the user account that will be linked with your vault.</ParagraphMedium>
           <AccountSelect/>
           <Button
             onClick={onSelectVaultAccount}
@@ -86,7 +86,7 @@ const Tutorial: FC<{letsGo: any}> = ({letsGo}) => {
         </Button>
       </NumberedStep>
       <NumberedStep title="Create Vault">
-        <ParagraphMedium>Your personal and private vault will hold your credentials.</ParagraphMedium>
+        <ParagraphMedium>Your personal and private vault will store your credentials.</ParagraphMedium>
         <Button
           isLoading={vaultLoading}
           onClick={onCreateVault}
@@ -96,7 +96,7 @@ const Tutorial: FC<{letsGo: any}> = ({letsGo}) => {
         </Button>
       </NumberedStep>
       <NumberedStep title="Enjoy :)">
-        <ParagraphMedium>Your personal and private vault has been created and is ready to hold your secret credentials :)</ParagraphMedium>
+        <ParagraphMedium>Your personal and private vault has been created and is ready to store your secret credentials :)</ParagraphMedium>
         <Button onClick={letsGo}>Let's go</Button>
       </NumberedStep>
     </ProgressSteps>
