@@ -38,4 +38,14 @@ export const types = {
     PhapassCommand: {
       _enum: {CreateVault: 'String', AddCredential: 'UrlCredential', RemoveCredential: 'String'},
     },
+    PhapassCommandType: {
+      _enum: ['CreateVault', 'AddCredential', 'RemoveCredential']
+    },
+    PhapassCommandResult: {
+      _enum: ['Success', 'VaultAlreadyExists', 'NoVault', 'NoCredential', 'UnknownError'],
+    },
+    PhaPassCommandEvent: {
+      command: 'PhapassCommandType',
+      result: 'PhapassCommandResult'
+    }
   }
