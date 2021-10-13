@@ -98,6 +98,10 @@ const vault:Vault = {
             if (!vaultState.account || !vaultState.api || !vaultState.phala) {
                 reject()
             }else{
+                resolve_when_command_has_been_executed(() => {
+                    vaultState.vaultReady = true
+                    resolve(vaultState.vaultReady)
+                })
                 vaultState.phala.command({
                     account: vaultState.account,
                     contractId: CONTRACT_ID,
@@ -107,10 +111,6 @@ const vault:Vault = {
                     signer,
                     onStatus: async (status: any) => {
                         onStatus(status)
-                        if (status.isFinalized) {
-                            vaultState.vaultReady = true
-                            resolve(vaultState.vaultReady)
-                        }
                     },
                 })
                 .catch((err: any) => {
@@ -207,6 +207,7 @@ const vault:Vault = {
             }else{
                 const encryptedPassword = vaultState.secret ? encryptPassword(password, vaultState.secret):undefined
                 console.log('encryptedPassword', encryptedPassword)
+                resolve_when_command_has_been_executed(resolve)
                 vaultState.phala.command({
                     account:vaultState.account,
                     contractId: CONTRACT_ID,
@@ -218,9 +219,6 @@ const vault:Vault = {
                     signer,
                     onStatus: async (status: any) => {
                         onStatus(status)
-                        if (status.isFinalized) {
-                            resolve({})
-                        }
                     },
                 })
                 .catch((err:any) => {
@@ -238,6 +236,7 @@ const vault:Vault = {
             if (!vaultState.account || !vaultState.api || !vaultState.phala) {
                 reject()
             }else{
+                resolve_when_command_has_been_executed(resolve)
                 vaultState.phala.command({
                     account:vaultState.account,
                     contractId: CONTRACT_ID,
@@ -247,9 +246,6 @@ const vault:Vault = {
                     signer,
                     onStatus: async (status: any) => {
                         onStatus(status)
-                        if (status.isFinalized) {
-                            resolve({})
-                        }
                     },
                 })
                 .catch((err:any) => {
@@ -262,4 +258,26 @@ const vault:Vault = {
       }
 }
 
+const resolve_when_command_has_been_executed = (resolve: any) => {
+    if (vaultState.api){
+        let unsubscribe_events: any = undefined;
+        vaultState.api.query.system.events((events) => {
+            console.debug(`\nReceived ${events.length} events:`);
+            events.forEach((record) => {
+                // Extract the phase, event and the event types
+                const { event, phase } = record;
+                console.debug(`\t${event.section}:${event.method}:: (phase=${phase.toString()})`);
+                if (event.section == 'phaPass' && event.method == 'CommandExecuted'){
+                    console.log('Command has been executed')
+                    if (unsubscribe_events){
+                    unsubscribe_events();
+                    }
+                    resolve({})
+                }
+            });
+        }).then((_unsub) => {
+            unsubscribe_events = _unsub
+        })
+    }
+}
 export default vault

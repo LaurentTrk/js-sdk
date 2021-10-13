@@ -1,6 +1,6 @@
 import {create as createPhala, PhalaInstance, CertificateData, signCertificate} from '@phala/sdk'
 import type {ApiPromise} from '@polkadot/api'
-import { closeNotification, enableOptionsPageDisplayOnButtonClick, installMessageListener, openOptionsPage, sendLengthyNotification, sendNotification
+import { closeNotification, enableOptionsPageDisplayOnButtonClick, installMessageListener, openOptionsPage, sendLengthyNotification, sendMessage, sendNotification
 } from 'lib/chrome'
 import {createApi} from 'lib/polkadotApi'
 import { getSigner } from 'lib/polkadotExtension'
@@ -43,6 +43,27 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
     }else{
       openOptionsPage()
     }
+
+    api.query.system.events((events) => {
+      console.log(`\nReceived ${events.length} events:`);
+
+      // Loop through the Vec<EventRecord>
+      events.forEach((record) => {
+        // Extract the phase, event and the event types
+        const { event, phase } = record;
+        const types = event.typeDef;
+
+        // Show what we are busy with
+        console.log(
+          `\t${event.section}:${event.method}:: (phase=${phase.toString()})`
+        );
+      });
+    });
+
+
+
+
+
   }, [])
 
   const onMessageFromOptionsPage =  (request: any, sender: any, sendResponse: any) => {
@@ -177,6 +198,8 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
       closeNotification(notificationId)
       sendNotification('Your credential has been saved !')
       sendResponse({})
+      sendMessage({command: "updateCredentials"}, () => {
+      })      
     }).catch(() => {
       closeNotification(notificationId)
       sendNotification('Something prevents us from removing your credential :(')

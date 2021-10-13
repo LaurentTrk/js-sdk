@@ -2,7 +2,7 @@ import { useState, FC, useEffect } from 'react'
 import { StyledBody} from "baseui/card";
 import { Button } from 'baseui/button'
 import Disclaimer from 'components/Disclaimer'
-import { sendMessage } from 'lib/chrome';
+import { installMessageListener, sendMessage } from 'lib/chrome';
 import {Block} from 'baseui/block'
 import {H4} from 'baseui/typography'
 import {
@@ -27,8 +27,19 @@ const Vault: FC = () => {
     sendMessage({command: "list"}, (response: any) => {
       setCredentials(response)
     })
+    installMessageListener(onMessageFromBackgroundPage);
   }, [])
   
+  const onMessageFromBackgroundPage =  (request: any, sender: any, sendResponse: any) => {
+    console.log("onMessageFromBackgroundPage");
+    if (request.command === 'updateCredentials'){
+      sendMessage({command: "list"}, (response: any) => {
+        setCredentials(response)
+      })
+    }
+    return true
+  }
+
   const copyPasswordToClipboard = (url: string) => {
     sendMessage({command: "get", url}, (credential: any) => {
       navigator.clipboard.writeText(credential.password);
