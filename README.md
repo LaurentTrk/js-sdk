@@ -11,4 +11,4 @@ See [this package](./packages/phapass-extension).
 
 The Blockchain part code of this project can be found in [this repository](https://github.com/LaurentTrk/phapass).
 
-
+See https://phapass.ltk.codes for the whole story.
