@@ -57,7 +57,7 @@ export const signCertificate = async ({
       signed_by: {
         encoded_body: api
           .createType('CertificateBody', {
-            pubkey: u8aToHex(decodeAddress(address)),
+            pubkey: u8aToHex(decodeAddress(signerAddress)),
             ttl: 0x7fffffff, // FIXME: max ttl is not safe
             config_bits: 0,
           })
