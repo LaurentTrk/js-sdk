@@ -50,7 +50,6 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
     console.log("onMessageFromOptionsPage " + sender.tab ?
       "from a content script:" + sender.tab.url :
       "from the extension");
-    console.log('request', request)
   if (request.command === 'signCertificate'){
       onSignCertificate(request.account, (certificate: CertificateData, vaultAlreadyCreated: Boolean) => {
         sendResponse({certificate, vaultAlreadyCreated})
@@ -67,12 +66,10 @@ const BackgroundVault = ({api, phala}: {api: ApiPromise; phala: PhalaInstance}) 
     console.log("onMessageFromContentScript " + sender.tab ?
       "from a content script:" + sender.tab.url :
       "from the extension");
-    console.log('request', request)
     const sanitizedUrl = sender.tab.url.split('#')[0].split('?')[0];
     const url = request.hasOwnProperty('url') ? request.url : sanitizedUrl
     if (request.command === "get" && vault.state?.certificate){
         const credential = await vault.getCredential(url)
-        console.log('credential', credential)
         if (credential){
           sendResponse(credential);
         }else{

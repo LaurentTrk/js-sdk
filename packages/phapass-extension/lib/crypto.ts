@@ -35,9 +35,7 @@ export const createVaultSecrets = (account : InjectedAccountWithMeta) => {
   
     const vaultEncryptedKeys = encrypt(vaultSecretKeys, vaultKeyPair.secretKey, publicKey);
     const vaultKeys = u8aToHex(u8aConcat(vaultKeyPair.publicKey, vaultEncryptedKeys));
-    console.log(`vaultSecret: ${u8aToHex(vaultSecret)}`);
     console.log(`vaultPublicKey: ${u8aToHex(vaultKeyPair.publicKey)}`);
-    console.log(`vaultSecretKey: ${u8aToHex(vaultKeyPair.secretKey)}`);
 
     return { vaultKeys, vaultSecret}
 }
@@ -47,8 +45,6 @@ export const decryptVaultSecrets = async (account : InjectedAccountWithMeta, vau
     const vaultDecryptedKeys = await (await getSigner(account)).decryptBytes(vaultSecretKeys,vaultPublicKey)
     const decryptedVaultSecret = vaultDecryptedKeys.slice(0, 32); 
     const decryptedVaultSecretKey = vaultDecryptedKeys.slice(32, vaultDecryptedKeys.length); 
-    console.log(`decryptedVaultSecret: ${u8aToHex(decryptedVaultSecret)}`);
-    console.log(`decryptedVaultSecretKey: ${u8aToHex(decryptedVaultSecretKey)}`); 
     return { decryptedVaultSecret, decryptedVaultSecretKey }
 }
 
@@ -62,15 +58,12 @@ export const encryptPassword = (password: string, secret: Uint8Array): string|un
 
 export  const decryptPassword = (encryptedPassword: string|undefined, secret: Uint8Array): string|undefined =>  {
     if (secret && encryptedPassword){
-        // const encryptedPasswordAsBytes = hexToU8a(encryptedPassword)
         const encryptedPasswordAsBytes = u8aToU8a(encryptedPassword)
         const encryptedPasswordAsHex = u8aToHex(encryptedPasswordAsBytes)
         console.log('encryptedPasswordAsHex', encryptedPasswordAsHex)
         const nonce = encryptedPasswordAsBytes.slice(0, NONCE_SIZE)
-        console.log('decrypted nonce size', nonce.length)
         const encrypted = encryptedPasswordAsBytes.slice(NONCE_SIZE, encryptedPasswordAsBytes.length)
         const decryptedPassword = naclDecrypt(encrypted, nonce, secret)
-        console.log('decryptedPassword', decryptedPassword)
         return u8aToString(decryptedPassword)
     }
     return undefined

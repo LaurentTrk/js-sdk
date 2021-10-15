@@ -12,7 +12,7 @@ const addPhalaLogoToField = (field) => {
 const allPasswordFields = document.querySelectorAll("input[type='password']");
 
 allPasswordFields.forEach(passwordField => {
-    console.log('[PhaPass] Found password !');
+    console.log('[PhaPass] Found password field !');
     console.debug('[PhaPass] Password is :',passwordField);
     console.debug('[PhaPass] Form is :',passwordField.form);
     console.debug('[PhaPass] Inputs :',passwordField.form.getElementsByTagName("input"));
@@ -25,7 +25,7 @@ allPasswordFields.forEach(passwordField => {
     addPhalaLogoToField(passwordField);
 
     chrome.runtime.sendMessage({command: "get"}, function(response) {
-        console.log('[PhaPass] response', response)
+        console.log('[PhaPass] Got a response from the extension')
         if (response.hasOwnProperty('username')){ 
             console.log('[PhaPass] Setting credential');
             usernameField.value = response.username;

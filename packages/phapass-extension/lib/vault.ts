@@ -122,8 +122,7 @@ const vault:Vault = {
                 })
             }
         })
-        return await phalaCommandPromise
-    },
+        return await phalaCommandPromise    },
 
 
     getKeys: async () => {
@@ -164,9 +163,7 @@ const vault:Vault = {
         const { result: {ok, err} } = vaultState.api.createType('PhapassResponse', hexAddPrefix(data)).toJSON() as any
     
         if (ok) {
-            console.log(ok);
             const { existingCredentials } = ok
-            console.log('existingCredentials.password', existingCredentials.password)
             if (vaultState.secret){
                 existingCredentials.password = decryptPassword(hexAddPrefix(existingCredentials.password), vaultState.secret)
             }
@@ -190,9 +187,7 @@ const vault:Vault = {
         const { result: {ok, err} } = vaultState.api.createType('PhapassResponse', hexAddPrefix(data)).toJSON() as any
 
         if (ok) {
-            console.log(ok);
             const { credentials } = ok
-            console.log('existingCredentials', credentials)
             return credentials
         }
 
