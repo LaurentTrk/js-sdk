@@ -1,0 +1,61 @@
+{
+    "ContractOwner": {"owner": "AccountId"},
+    "PhapassCredential": {
+      "username": "String",
+      "password": "String"
+    },
+    "UrlCredential": {
+      "command_id": "String",
+      "url": "String",
+      "username": "String",
+      "password": "String"
+    },
+    "KeysCommandArguments": {
+      "command_id": "String",
+      "keys": "String"
+    },
+    "RemoveCredentialCommandArguments": {
+      "command_id": "String",
+      "url": "String"
+    },
+    "ListedCredential": {
+      "url": "String",
+      "username": "String"
+    },
+    "PhapassError": {
+      "_enum": ["OriginUnavailable", "VaultAlreadyExists", "NoVault", "NoCredential", "NotAuthorized"]
+    },
+    "PhapassRequestData": {
+      "_enum": {"HasAVault": "null",  "GetKeys": "String", "GetCredential": "String", "ListCredentials": "null"}
+    },
+    "PhapassResponseData": {
+      "_enum": {
+        "HasAVault": "bool",
+        "Keys": "String",
+        "ExistingCredentials": "PhapassCredential",
+        "Credentials": "Vec<ListedCredential>"
+      }
+    },
+    "PhapassRequest": {
+      "head": "ContractQueryHead",
+      "data": "PhapassRequestData"
+    },
+    "PhapassResponse": {
+      "nonce": "[u8; 32]",
+      "result": "Result<PhapassResponseData, PhapassError>"
+    },
+    "PhapassCommand": {
+      "_enum": {"CreateVault": "KeysCommandArguments", "AddCredential": "UrlCredential", "RemoveCredential": "RemoveCredentialCommandArguments"}
+    },
+    "PhapassCommandType": {
+      "_enum": ["CreateVault", "AddCredential", "RemoveCredential"]
+    },
+    "PhapassCommandResult": {
+      "_enum": ["Success", "VaultAlreadyExists", "NoVault", "NoCredential", "UnknownError"]
+    },
+    "PhaPassCommandEvent": {
+      "command_id": "String",
+      "command": "PhapassCommandType",
+      "result": "PhapassCommandResult"
+    }
+    }   
